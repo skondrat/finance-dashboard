@@ -1,0 +1,125 @@
+"""
+Income source endpoints (T066).
+"""
+
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user_id
+from app.database import get_db
+from app.models.income_source import IncomeSource
+from app.schemas.budget import IncomeSourceCreate, IncomeSourceResponse
+
+router = APIRouter(prefix="/api/v1", tags=["income"])
+
+
+# ---------------------------------------------------------------------------
+# List income sources
+# ---------------------------------------------------------------------------
+
+
+@router.get("/budget/income", response_model=list[IncomeSourceResponse])
+def list_income_sources(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Return income sources with optional year/month filtering."""
+    query = db.query(IncomeSource).filter(IncomeSource.user_id == user_id)
+
+    if year is not None:
+        query = query.filter(IncomeSource.year == year)
+    if month is not None:
+        query = query.filter(IncomeSource.month == month)
+
+    return query.order_by(IncomeSource.year.desc(), IncomeSource.month.desc()).all()
+
+
+# ---------------------------------------------------------------------------
+# Create income source
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/budget/income",
+    response_model=IncomeSourceResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_income_source(
+    payload: IncomeSourceCreate,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Create a new income source entry."""
+    income = IncomeSource(
+        user_id=user_id,
+        label=payload.label,
+        amount=payload.amount,
+        currency=payload.currency,
+        month=payload.month,
+        year=payload.year,
+    )
+    db.add(income)
+    db.commit()
+    db.refresh(income)
+    return income
+
+
+# ---------------------------------------------------------------------------
+# Update income source
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/budget/income/{income_id}", response_model=IncomeSourceResponse)
+def update_income_source(
+    income_id: str,
+    payload: IncomeSourceCreate,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Update an income source entry."""
+    income = (
+        db.query(IncomeSource)
+        .filter(IncomeSource.id == income_id, IncomeSource.user_id == user_id)
+        .first()
+    )
+    if income is None:
+        raise HTTPException(status_code=404, detail="Income source not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(income, field, value)
+
+    db.commit()
+    db.refresh(income)
+    return income
+
+
+# ---------------------------------------------------------------------------
+# Delete income source
+# ---------------------------------------------------------------------------
+
+
+@router.delete(
+    "/budget/income/{income_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_income_source(
+    income_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Delete an income source entry."""
+    income = (
+        db.query(IncomeSource)
+        .filter(IncomeSource.id == income_id, IncomeSource.user_id == user_id)
+        .first()
+    )
+    if income is None:
+        raise HTTPException(status_code=404, detail="Income source not found")
+
+    db.delete(income)
+    db.commit()

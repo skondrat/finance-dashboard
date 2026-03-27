@@ -1,0 +1,35 @@
+[project]
+name = "finance-dashboard-backend"
+version = "0.1.0"
+description = "Personal finance dashboard API"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy[sqlite]>=2.0.0",
+    "alembic>=1.13.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "httpx>=0.27.0",
+    "ofxparse>=0.21",
+    "mt-940>=4.0",
+    "finnhub-python>=2.4.0",
+    "pycoingecko>=3.1.0",
+    "python-multipart>=0.0.9",
+    "pydantic[email]>=2.0.0",
+    "pydantic-settings>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

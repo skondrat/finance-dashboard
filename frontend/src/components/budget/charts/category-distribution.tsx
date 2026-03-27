@@ -1,0 +1,172 @@
+"use client";
+
+import { useCallback, useState } from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { useCategoryDistribution } from "@/lib/queries/budget-charts";
+import { useCurrencyStore } from "@/stores/currency-store";
+import { formatCurrency } from "@/lib/utils";
+
+// Monochromatic palette with green accent for savings-like categories
+const MONO_PALETTE = [
+  "#1a1a1a",
+  "#333333",
+  "#4d4d4d",
+  "#666666",
+  "#808080",
+  "#999999",
+  "#b3b3b3",
+  "#cccccc",
+  "#009668",
+  "#d4d4d4",
+  "#a3a3a3",
+  "#737373",
+];
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    payload: { category_name: string; pct: number };
+  }>;
+  currency: string;
+}
+
+function ChartTooltip({ active, payload, currency }: CustomTooltipProps) {
+  if (!active || !payload?.length) return null;
+
+  const entry = payload[0];
+  return (
+    <div className="rounded-xl bg-surface-container-lowest/80 backdrop-blur-[20px] shadow-ambient px-4 py-3">
+      <p className="font-mono text-xs text-on-surface-variant mb-1">
+        {entry.payload.category_name}
+      </p>
+      <p className="font-display text-sm font-medium text-on-surface">
+        {formatCurrency(entry.value, currency)}
+      </p>
+      <p className="font-mono text-xs text-on-surface-variant">
+        {entry.payload.pct.toFixed(1)}%
+      </p>
+    </div>
+  );
+}
+
+interface CategoryDistributionChartProps {
+  period?: string;
+  month?: number;
+  year?: number;
+}
+
+export function CategoryDistributionChart({
+  period = "monthly",
+  month,
+  year,
+}: CategoryDistributionChartProps) {
+  const { data, isLoading } = useCategoryDistribution(period, month, year);
+  const currency = useCurrencyStore((s) => s.currency);
+
+  const chartData = data?.categories.map((cat, idx) => ({
+    ...cat,
+    fill: cat.color || MONO_PALETTE[idx % MONO_PALETTE.length],
+  })) ?? [];
+
+  return (
+    <div className="rounded-2xl bg-surface-container-low p-6">
+      <h2 className="font-display text-xl font-medium text-on-surface mb-6">
+        Spending by Category
+      </h2>
+
+      <div className="h-72">
+        {isLoading || !data ? (
+          <div className="h-full w-full animate-pulse rounded-xl bg-surface-container-lowest" />
+        ) : chartData.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <p className="font-mono text-sm text-on-surface-variant">
+              No spending data
+            </p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={chartData}
+                dataKey="amount"
+                nameKey="category_name"
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={100}
+                paddingAngle={2}
+                strokeWidth={0}
+              >
+                {chartData.map((entry, idx) => (
+                  <Cell
+                    key={entry.category_id ?? idx}
+                    fill={entry.fill}
+                  />
+                ))}
+              </Pie>
+              <Tooltip
+                content={<ChartTooltip currency={currency} />}
+              />
+              {/* Center label */}
+              <text
+                x="50%"
+                y="48%"
+                textAnchor="middle"
+                dominantBaseline="central"
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  fill: "var(--color-on-surface-variant, #666)",
+                }}
+              >
+                TOTAL SPEND
+              </text>
+              <text
+                x="50%"
+                y="56%"
+                textAnchor="middle"
+                dominantBaseline="central"
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  fill: "var(--color-on-surface, #1a1a1a)",
+                }}
+              >
+                {formatCurrency(data.total_spend, currency)}
+              </text>
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Legend */}
+      {data && chartData.length > 0 && (
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {chartData.slice(0, 8).map((entry, idx) => (
+            <div key={entry.category_id ?? idx} className="flex items-center gap-2">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: entry.fill }}
+              />
+              <span className="font-mono text-xs text-on-surface-variant truncate">
+                {entry.category_name}
+              </span>
+              <span className="font-mono text-xs text-on-surface-variant ml-auto">
+                {entry.pct.toFixed(1)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

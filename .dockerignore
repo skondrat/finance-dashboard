@@ -1,0 +1,17 @@
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.git/
+.gitignore
+*.md
+.env*
+coverage/
+.pytest_cache/
+.DS_Store
+data/
+specs/
+.specify/
+.claude/
