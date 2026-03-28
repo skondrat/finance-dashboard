@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   useImportUpload,
+  useImportWithProgress,
   useConfirmImport,
   useImportCategories,
   useSeedCategoriesUpload,
@@ -262,11 +263,17 @@ export function ImportModal() {
   const currency = useCurrencyStore((s) => s.currency);
 
   const uploadMutation = useImportUpload();
+  const { progress: sseProgress, upload: sseUpload, reset: sseReset } = useImportWithProgress();
   const confirmMutation = useConfirmImport();
   const { data: categoriesData } = useImportCategories();
   const categories = categoriesData?.categories ?? [];
 
   const isPdf = selectedFile?.name?.toLowerCase().endsWith(".pdf") ?? false;
+
+  // When SSE import completes, set preview
+  if (sseProgress.stage === "complete" && sseProgress.result && !preview) {
+    setPreview(sseProgress.result);
+  }
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -295,16 +302,7 @@ export function ImportModal() {
 
   function handleUploadPdf() {
     if (!selectedFile || !selectedSource) return;
-
-    uploadMutation.mutate(
-      { file: selectedFile, source: selectedSource },
-      {
-        onSuccess: (data) => {
-          setPreview(data);
-          setOverrides(new Map());
-        },
-      }
-    );
+    sseUpload(selectedFile, selectedSource);
   }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -359,6 +357,7 @@ export function ImportModal() {
     setSelectedFile(null);
     setSelectedSource("");
     uploadMutation.reset();
+    sseReset();
   }
 
   function handleClose() {
@@ -368,23 +367,26 @@ export function ImportModal() {
     setSelectedSource("");
     setShowSeedUpload(false);
     uploadMutation.reset();
+    sseReset();
     setIsOpen(false);
   }
 
-  // Parse error detail from API
-  const errorMessage = uploadMutation.isError
-    ? (() => {
-        try {
-          const parsed = JSON.parse(uploadMutation.error.message);
-          if (parsed.message && parsed.action) {
-            return `${parsed.message} ${parsed.action}`;
+  // Parse error detail from API or SSE
+  const errorMessage = sseProgress.error
+    ? sseProgress.error
+    : uploadMutation.isError
+      ? (() => {
+          try {
+            const parsed = JSON.parse(uploadMutation.error.message);
+            if (parsed.message && parsed.action) {
+              return `${parsed.message} ${parsed.action}`;
+            }
+          } catch {
+            // not JSON
           }
-        } catch {
-          // not JSON
-        }
-        return uploadMutation.error.message;
-      })()
-    : null;
+          return uploadMutation.error.message;
+        })()
+      : null;
 
   return (
     <>
@@ -458,18 +460,39 @@ export function ImportModal() {
                       </select>
                       <button
                         onClick={handleUploadPdf}
-                        disabled={!selectedSource || uploadMutation.isPending}
+                        disabled={!selectedSource || sseProgress.isProcessing}
                         className="rounded-xl bg-on-surface px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-surface transition-colors hover:bg-on-surface/90 disabled:opacity-50"
                       >
-                        {uploadMutation.isPending
+                        {sseProgress.isProcessing
                           ? "Processing..."
                           : "Upload"}
                       </button>
                     </div>
-                    {selectedSource === "other" && (
+                    {selectedSource === "other" && !sseProgress.isProcessing && (
                       <p className="font-body text-xs text-on-surface-variant/60">
                         AI will attempt to detect column layout automatically.
                       </p>
+                    )}
+                    {/* SSE Progress Display */}
+                    {sseProgress.isProcessing && (
+                      <div className="mt-3 space-y-2">
+                        <p className="font-mono text-xs text-on-surface-variant animate-pulse">
+                          {sseProgress.stage === "extracting" && "Extracting transactions..."}
+                          {sseProgress.stage === "categorizing" &&
+                            `Categorizing: ${sseProgress.done} / ${sseProgress.total} transactions`}
+                          {sseProgress.stage === "saving" && "Preparing preview..."}
+                        </p>
+                        {sseProgress.stage === "categorizing" && sseProgress.total > 0 && (
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-on-surface-variant/10">
+                            <div
+                              className="h-full rounded-full bg-on-surface transition-all duration-300"
+                              style={{
+                                width: `${Math.round((sseProgress.done / sseProgress.total) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

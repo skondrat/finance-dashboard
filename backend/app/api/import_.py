@@ -1,12 +1,15 @@
 """
 Statement import and bank profile endpoints (T063 + T064).
-Extended for PDF import with source selection and categorization.
+Extended for PDF import with source selection, categorization, and SSE progress.
 """
 
+import asyncio
+import json as json_mod
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id
@@ -28,6 +31,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["import"])
 
+
+def _sse_event(data: dict) -> str:
+    """Format a dict as an SSE data line."""
+    return f"data: {json_mod.dumps(data)}\n\n"
+
 _FORMAT_MAP = {
     ".csv": "csv",
     ".ofx": "ofx",
@@ -45,7 +53,6 @@ _FORMAT_MAP = {
 
 @router.post(
     "/budget/import/upload",
-    response_model=ImportUploadResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def upload_import(
@@ -55,7 +62,11 @@ async def upload_import(
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
-    """Upload a bank statement file for parsing and preview."""
+    """Upload a bank statement file for parsing and preview.
+
+    For PDF imports, returns an SSE stream with progress events.
+    For non-PDF imports, returns ImportUploadResponse JSON directly.
+    """
     filename = file.filename or "unknown"
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     fmt = _FORMAT_MAP.get(ext)
@@ -95,8 +106,65 @@ async def upload_import(
             detail={"error_type": "file_too_large", "message": "PDF file exceeds 10 MB size limit.", "action": "Upload a smaller PDF file."},
         )
 
+    # For PDF imports, stream progress via SSE
+    if fmt == "pdf":
+        progress_queue: asyncio.Queue[dict] = asyncio.Queue()
+
+        def on_progress(done: int, total: int) -> None:
+            progress_queue.put_nowait({"stage": "categorizing", "total": total, "done": done})
+
+        async def sse_generator():
+            try:
+                yield _sse_event({"stage": "extracting"})
+
+                # Run import as a background task so we can drain progress events
+                import_task = asyncio.create_task(import_service.create_import(
+                    db,
+                    user_id=user_id,
+                    filename=filename,
+                    file_content=file_content,
+                    fmt=fmt,
+                    bank_profile_id=bank_profile_id,
+                    source=source,
+                    source_config=source_config,
+                    on_categorization_progress=on_progress,
+                ))
+
+                # Yield progress events as they arrive while import runs
+                while not import_task.done():
+                    try:
+                        evt = await asyncio.wait_for(progress_queue.get(), timeout=0.5)
+                        yield _sse_event(evt)
+                    except asyncio.TimeoutError:
+                        continue
+
+                # Drain any remaining queued events
+                while not progress_queue.empty():
+                    evt = progress_queue.get_nowait()
+                    yield _sse_event(evt)
+
+                result = import_task.result()
+
+                yield _sse_event({"stage": "saving"})
+
+                # Convert Decimal amounts to float for JSON serialization
+                for row in result.get("rows", []):
+                    if hasattr(row.get("amount"), "__float__") and not isinstance(row.get("amount"), (int, float)):
+                        row["amount"] = float(row["amount"])
+
+                yield _sse_event({"stage": "complete", "result": result})
+
+            except ValueError as e:
+                yield _sse_event({"stage": "error", "message": str(e), "error_type": "parse_error"})
+            except Exception as e:
+                logger.exception("SSE import failed")
+                yield _sse_event({"stage": "error", "message": str(e), "error_type": "server_error"})
+
+        return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
+    # Non-PDF: standard JSON response
     try:
-        result = import_service.create_import(
+        result = await import_service.create_import(
             db,
             user_id=user_id,
             filename=filename,

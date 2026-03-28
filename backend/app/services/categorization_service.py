@@ -9,8 +9,10 @@ Matches transaction descriptions using a resolution chain:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
+from collections.abc import Callable
 
 from sqlalchemy.orm import Session
 
@@ -151,6 +153,125 @@ def categorize_transactions_batch(
             results[idx] = {"category_id": None, "category_name": None, "category_source": "none"}
     else:
         # AI not available — mark all remaining as uncategorized
+        for idx, _ in ai_needed:
+            results[idx] = {"category_id": None, "category_name": None, "category_source": "none"}
+
+    return results
+
+
+async def categorize_transactions_batch_async(
+    db: Session,
+    user_id: str,
+    descriptions: list[str],
+    on_progress: Callable[[int, int], None] | None = None,
+) -> dict[int, dict]:
+    """Categorize transactions with concurrent AI calls (max 10 at a time).
+
+    Steps 1 (mapping file) and 2 (keyword rules) run synchronously.
+    Step 3 (AI suggestion) runs concurrently with a semaphore.
+    Calls on_progress(done, total) after each AI categorization completes.
+    """
+    from app.services.mapping_file_service import load_mappings
+    from app.services import llm_service
+
+    results: dict[int, dict] = {}
+
+    mappings = load_mappings()
+
+    categories = (
+        db.query(Category)
+        .filter(Category.user_id == user_id, Category.is_archived == False)  # noqa: E712
+        .all()
+    )
+    category_by_name: dict[str, Category] = {c.name.lower(): c for c in categories}
+    known_category_names = [c.name for c in categories]
+
+    rules = (
+        db.query(AutoCatRule)
+        .join(Category, AutoCatRule.category_id == Category.id)
+        .filter(
+            Category.user_id == user_id,
+            Category.is_archived == False,  # noqa: E712
+        )
+        .all()
+    )
+
+    ai_needed: list[tuple[int, str]] = []
+
+    for idx, description in enumerate(descriptions):
+        if not description:
+            results[idx] = {"category_id": None, "category_name": None, "category_source": "none"}
+            continue
+
+        desc_lower = description.lower().strip()
+
+        # Step 1: Exact match from mapping file
+        if desc_lower in mappings:
+            cat_name = mappings[desc_lower]
+            cat = category_by_name.get(cat_name.lower())
+            if cat:
+                results[idx] = {
+                    "category_id": cat.id,
+                    "category_name": cat.name,
+                    "category_source": "mapping",
+                }
+                continue
+
+        # Step 2: Keyword match via AutoCatRule
+        matched = False
+        for rule in rules:
+            if rule.keyword.lower() in desc_lower:
+                cat = db.query(Category).filter(Category.id == rule.category_id).first()
+                results[idx] = {
+                    "category_id": rule.category_id,
+                    "category_name": cat.name if cat else None,
+                    "category_source": "rule",
+                }
+                matched = True
+                break
+
+        if matched:
+            continue
+
+        ai_needed.append((idx, description))
+
+    # Step 3: Concurrent AI categorization
+    if ai_needed and llm_service.is_available() and known_category_names:
+        semaphore = asyncio.Semaphore(10)
+        done_count = 0
+        total_ai = len(ai_needed)
+
+        async def _categorize_one(idx: int, description: str) -> None:
+            nonlocal done_count
+            async with semaphore:
+                try:
+                    suggested_name = await llm_service.suggest_category_async(
+                        description, mappings, known_category_names
+                    )
+                    if suggested_name:
+                        cat = category_by_name.get(suggested_name.lower())
+                        if cat:
+                            results[idx] = {
+                                "category_id": cat.id,
+                                "category_name": cat.name,
+                                "category_source": "ai",
+                            }
+                            done_count += 1
+                            if on_progress:
+                                on_progress(done_count, total_ai)
+                            return
+
+                    results[idx] = {"category_id": None, "category_name": None, "category_source": "none"}
+                except Exception:
+                    logger.warning("AI categorization failed for idx=%d", idx)
+                    results[idx] = {"category_id": None, "category_name": None, "category_source": "none"}
+
+                done_count += 1
+                if on_progress:
+                    on_progress(done_count, total_ai)
+
+        await asyncio.gather(*[_categorize_one(idx, desc) for idx, desc in ai_needed])
+    else:
         for idx, _ in ai_needed:
             results[idx] = {"category_id": None, "category_name": None, "category_source": "none"}
 

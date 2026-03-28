@@ -8,12 +8,28 @@ import uuid
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.budget_transaction import BudgetTransaction
 from app.models.category import Category
 from app.models.income_source import IncomeSource
+from app.models.statement_import import StatementImport
+
+
+def _confirmed_tx_filter():
+    """Filter that excludes transactions from unconfirmed (preview/discarded) imports.
+
+    Includes transactions with no import_id (manually created) and
+    transactions whose import status is 'confirmed'.
+    """
+    from sqlalchemy import select as sa_select
+    return or_(
+        BudgetTransaction.import_id.is_(None),
+        BudgetTransaction.import_id.in_(
+            sa_select(StatementImport.id).where(StatementImport.status == "confirmed")
+        ),
+    )
 
 _ZERO = Decimal("0")
 _HUNDRED = Decimal("100")
@@ -121,6 +137,7 @@ def _spend_for_period(
         BudgetTransaction.date >= start,
         BudgetTransaction.date < end,
         BudgetTransaction.amount < 0,
+        _confirmed_tx_filter(),
     )
     if category_id is not None:
         q = q.filter(BudgetTransaction.category_id == category_id)
@@ -146,6 +163,7 @@ def _investment_spend_for_period(
             BudgetTransaction.date < end,
             BudgetTransaction.is_investment == True,  # noqa: E712
             BudgetTransaction.amount < 0,
+            _confirmed_tx_filter(),
         )
         .scalar()
     )
@@ -288,6 +306,7 @@ def get_spend_by_category(
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.amount < 0,
+            _confirmed_tx_filter(),
         )
         .group_by(BudgetTransaction.category_id)
         .all()
