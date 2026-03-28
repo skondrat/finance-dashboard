@@ -1,5 +1,6 @@
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getAccessToken } from "@/lib/api";
 import { useCurrencyStore } from "@/stores/currency-store";
 
 export interface BudgetSummary {
@@ -207,6 +208,165 @@ export function useImportUpload() {
       queryClient.invalidateQueries({ queryKey: ["budget"] });
     },
   });
+}
+
+export interface ImportProgress {
+  stage: "idle" | "extracting" | "categorizing" | "saving" | "complete" | "error";
+  total: number;
+  done: number;
+  result: ImportResponse | null;
+  error: string | null;
+  isProcessing: boolean;
+}
+
+export function useImportWithProgress() {
+  const queryClient = useQueryClient();
+  const [progress, setProgress] = useState<ImportProgress>({
+    stage: "idle",
+    total: 0,
+    done: 0,
+    result: null,
+    error: null,
+    isProcessing: false,
+  });
+
+  const upload = useCallback(
+    async (file: File, source?: string) => {
+      setProgress({
+        stage: "extracting",
+        total: 0,
+        done: 0,
+        result: null,
+        error: null,
+        isProcessing: true,
+      });
+
+      const API_BASE =
+        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+
+      const formData = new FormData();
+      formData.append("file", file);
+      if (source) {
+        formData.append("source", source);
+      }
+
+      try {
+        const headers: Record<string, string> = {};
+        const token = getAccessToken();
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${API_BASE}/budget/import/upload`, {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+          headers,
+        });
+
+        if (!response.ok || !response.body) {
+          const error = await response
+            .json()
+            .catch(() => ({ detail: response.statusText }));
+          const detail = error.detail;
+          const message =
+            typeof detail === "string"
+              ? detail
+              : typeof detail === "object" && detail.message
+                ? `${detail.message} ${detail.action ?? ""}`
+                : `API error: ${response.status}`;
+          setProgress((p) => ({
+            ...p,
+            stage: "error",
+            error: message,
+            isProcessing: false,
+          }));
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Parse SSE events from buffer
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const jsonStr = line.slice(6);
+            if (!jsonStr.trim()) continue;
+
+            try {
+              const evt = JSON.parse(jsonStr);
+
+              if (evt.stage === "extracting") {
+                setProgress((p) => ({ ...p, stage: "extracting" }));
+              } else if (evt.stage === "categorizing") {
+                setProgress((p) => ({
+                  ...p,
+                  stage: "categorizing",
+                  total: evt.total ?? p.total,
+                  done: evt.done ?? p.done,
+                }));
+              } else if (evt.stage === "saving") {
+                setProgress((p) => ({ ...p, stage: "saving" }));
+              } else if (evt.stage === "complete") {
+                setProgress({
+                  stage: "complete",
+                  total: 0,
+                  done: 0,
+                  result: evt.result,
+                  error: null,
+                  isProcessing: false,
+                });
+                queryClient.invalidateQueries({ queryKey: ["budget"] });
+              } else if (evt.stage === "error") {
+                setProgress((p) => ({
+                  ...p,
+                  stage: "error",
+                  error: evt.message ?? "Import failed",
+                  isProcessing: false,
+                }));
+              }
+            } catch {
+              // skip malformed SSE lines
+            }
+          }
+        }
+      } catch (err) {
+        setProgress((p) => ({
+          ...p,
+          stage: "error",
+          error:
+            err instanceof Error
+              ? err.message
+              : "Connection lost. The import may still be processing.",
+          isProcessing: false,
+        }));
+      }
+    },
+    [queryClient]
+  );
+
+  const reset = useCallback(() => {
+    setProgress({
+      stage: "idle",
+      total: 0,
+      done: 0,
+      result: null,
+      error: null,
+      isProcessing: false,
+    });
+  }, []);
+
+  return { progress, upload, reset };
 }
 
 export function useConfirmImport() {

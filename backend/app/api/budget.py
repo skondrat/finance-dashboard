@@ -39,7 +39,8 @@ def list_transactions(
     user_id: str = Depends(get_current_user_id),
 ):
     """Return paginated budget transactions with optional filters."""
-    query = db.query(BudgetTransaction).filter(BudgetTransaction.user_id == user_id)
+    from app.services.budget_service import _confirmed_tx_filter
+    query = db.query(BudgetTransaction).filter(BudgetTransaction.user_id == user_id, _confirmed_tx_filter())
 
     if category_id is not None:
         query = query.filter(BudgetTransaction.category_id == category_id)

@@ -55,7 +55,7 @@ def _existing_hashes(db: Session, user_id: str, hashes: list[str]) -> set[str]:
 # ---------------------------------------------------------------------------
 
 
-def create_import(
+async def create_import(
     db: Session,
     user_id: str,
     filename: str,
@@ -65,10 +65,12 @@ def create_import(
     currency: str = "EUR",
     source: str | None = None,
     source_config: dict | None = None,
+    on_categorization_progress: object | None = None,
 ) -> dict:
     """Parse a statement file and create a preview import.
 
     Returns a dict with import metadata, rows (with categorization info), and counts.
+    on_categorization_progress: Optional callback(done, total) for progress reporting.
     """
     statement_format = StatementFormat(fmt)
 
@@ -106,8 +108,9 @@ def create_import(
 
     if is_pdf:
         from app.services import categorization_service
-        category_results = categorization_service.categorize_transactions_batch(
-            db, user_id, [row.get("description", "") for row in parsed_rows]
+        category_results = await categorization_service.categorize_transactions_batch_async(
+            db, user_id, [row.get("description", "") for row in parsed_rows],
+            on_progress=on_categorization_progress,
         )
 
     # Compute dedup hashes

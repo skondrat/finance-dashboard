@@ -15,6 +15,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 _client: anthropic.Anthropic | None = None
+_async_client: anthropic.AsyncAnthropic | None = None
 
 
 def _get_client() -> anthropic.Anthropic:
@@ -22,6 +23,13 @@ def _get_client() -> anthropic.Anthropic:
     if _client is None:
         _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
     return _client
+
+
+def _get_async_client() -> anthropic.AsyncAnthropic:
+    global _async_client
+    if _async_client is None:
+        _async_client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    return _async_client
 
 
 def is_available() -> bool:
@@ -98,6 +106,73 @@ def suggest_category(
             return None
     except Exception:
         logger.exception("LLM suggest_category failed")
+        return None
+
+
+async def suggest_category_async(
+    description: str,
+    existing_mappings: dict[str, str],
+    known_categories: list[str],
+) -> str | None:
+    """Async version of suggest_category using AsyncAnthropic client."""
+    if not is_available():
+        return None
+
+    if not known_categories:
+        return None
+
+    examples = list(existing_mappings.items())[-50:]
+    examples_text = "\n".join(f'- "{desc}" -> {cat}' for desc, cat in examples)
+
+    categories_text = ", ".join(known_categories)
+
+    examples_section = ""
+    if examples_text:
+        examples_section = "Here are examples of previous categorizations:\n" + examples_text + "\n\n"
+
+    prompt = (
+        "You are a financial transaction categorizer. Given a transaction description, "
+        "assign it to exactly one of the following categories:\n\n"
+        f"Categories: {categories_text}\n\n"
+        f"{examples_section}"
+        f'Transaction description: "{description}"\n\n'
+        'Respond with only the category name, nothing else. If you cannot determine a category, respond with "UNKNOWN".'
+    )
+
+    try:
+        client = _get_async_client()
+        message = await client.messages.create(
+            model=settings.LLM_MODEL,
+            max_tokens=100,
+            timeout=30.0,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        result = message.content[0].text.strip()
+
+        if result == "UNKNOWN" or result not in known_categories:
+            return None
+
+        return result
+
+    except (anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
+        logger.warning("Async LLM request failed, retrying: %s", e)
+        try:
+            client = _get_async_client()
+            message = await client.messages.create(
+                model=settings.LLM_MODEL,
+                max_tokens=100,
+                timeout=30.0,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            result = message.content[0].text.strip()
+            if result == "UNKNOWN" or result not in known_categories:
+                return None
+            return result
+        except Exception:
+            logger.error("Async LLM retry also failed")
+            return None
+    except Exception:
+        logger.exception("Async suggest_category failed")
         return None
 
 
