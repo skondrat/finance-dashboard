@@ -1,8 +1,9 @@
 """
-PDF statement parser using pdfplumber (T009).
+PDF statement parser using pdfplumber + LLM (T009, 003-llm-pdf-parsing).
 
-Extracts transactions from PDF bank statements using source-specific
-column mappings or AI-suggested mappings for unknown sources.
+Extracts transactions from PDF bank statements using LLM-based text parsing.
+Raw text is extracted via pdfplumber and sent to the Anthropic API for
+structured transaction extraction.
 """
 
 from __future__ import annotations
@@ -21,145 +22,105 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB (FR-002)
 
 
 class PdfParser(StatementParser):
-    """Parse PDF bank statements using column mapping configuration."""
+    """Parse PDF bank statements using LLM-based text extraction."""
 
     def parse(self, file_content: bytes, bank_profile=None, *, source_config: dict | None = None) -> list[dict]:
-        """Parse a PDF statement and return transaction rows.
+        """Parse a PDF statement and return transaction rows using LLM extraction.
 
         Args:
             file_content: Raw PDF bytes.
             bank_profile: Ignored for PDF (exists for interface compatibility).
-            source_config: Column mapping configuration dict with keys:
-                date_column, description_column, amount_column,
-                currency_column, type_column, date_format,
-                debit_value, credit_value, table_index (optional).
+            source_config: Optional dict. If present, may contain 'source_hint'
+                for context (e.g., "payoneer"). Column mapping keys are ignored
+                since the LLM handles format detection.
 
         Returns:
             List of dicts with keys: date, description, amount, currency, type, reference.
         """
+        from app.services import llm_service
+
         # Validate file size (FR-002)
         if len(file_content) > MAX_FILE_SIZE:
             raise ValueError("PDF file exceeds 10 MB size limit")
 
-        # Check for password protection (FR-017)
-        if file_content[:5] == b"%PDF-":
-            pass  # valid PDF header
-        elif len(file_content) < 5:
+        if len(file_content) < 5:
             raise ValueError("Invalid PDF file")
 
-        if source_config is None:
-            raise ValueError("Source configuration is required for PDF parsing")
+        # Extract raw text from PDF pages
+        page_texts = self._extract_text_from_pdf(file_content)
+        if not page_texts:
+            raise ValueError("No extractable text found in PDF")
 
-        tables = self._extract_tables(file_content, source_config)
-        if not tables:
-            raise ValueError("No extractable tables found in PDF")
+        # Use LLM to extract structured transactions
+        source_hint = None
+        if source_config and "source_hint" in source_config:
+            source_hint = source_config["source_hint"]
 
-        return self._map_rows(tables, source_config)
+        raw_transactions = llm_service.extract_transactions_from_text(
+            page_texts, source_hint=source_hint
+        )
+        if not raw_transactions:
+            raise ValueError("Failed to extract transactions from PDF")
 
-    def _extract_tables(self, file_content: bytes, source_config: dict) -> list[list[str]]:
-        """Extract table rows from PDF using pdfplumber."""
-        import io
-
-        all_rows: list[list[str]] = []
-        table_index = source_config.get("table_index", 0)
-
-        try:
-            with pdfplumber.open(io.BytesIO(file_content)) as pdf:
-                for page in pdf.pages:
-                    tables = page.extract_tables()
-                    if not tables:
-                        continue
-
-                    # Use the configured table index, defaulting to first table
-                    if table_index < len(tables):
-                        table = tables[table_index]
-                    else:
-                        table = tables[0]
-
-                    for row in table:
-                        if row and any(cell for cell in row):
-                            all_rows.append([str(cell or "").strip() for cell in row])
-        except Exception as e:
-            if "password" in str(e).lower() or "encrypted" in str(e).lower():
-                raise ValueError("Password-protected PDFs are not supported") from e
-            raise ValueError(f"Failed to parse PDF: {e}") from e
-
-        return all_rows
-
-    def _map_rows(self, raw_rows: list[list[str]], config: dict) -> list[dict]:
-        """Map raw table rows to transaction dicts using column config."""
-        date_col = config["date_column"]
-        desc_col = config["description_column"]
-        amount_col = config["amount_column"]
-        currency_col = config["currency_column"]
-        type_col = config["type_column"]
-        date_format = config.get("date_format", "%Y-%m-%d")
-        debit_value = config.get("debit_value", "Debit")
-        credit_value = config.get("credit_value", "Credit")
-
-        max_col = max(date_col, desc_col, amount_col, currency_col, type_col)
+        # Validate and normalize each transaction
         transactions: list[dict] = []
-
-        # Skip first row if it looks like a header
-        start_idx = 0
-        if raw_rows and len(raw_rows) > 1:
-            first_row = raw_rows[0]
-            if any(
-                h.lower() in ("date", "description", "amount", "currency", "type", "debit", "credit")
-                for h in first_row
-                if h
-            ):
-                start_idx = 1
-
-        for row in raw_rows[start_idx:]:
-            if len(row) <= max_col:
+        for tx in raw_transactions:
+            description = str(tx.get("description", "")).strip()
+            if not description:
                 continue
 
-            description = row[desc_col].strip()
-            amount_str = row[amount_col].strip()
-
-            # Skip rows with missing description or amount (FR-018)
-            if not description or not amount_str:
-                continue
-
-            # Parse date
-            date_str = row[date_col].strip()
+            # Normalize date to ISO format
+            date_str = str(tx.get("date", "")).strip()
             if not date_str:
                 continue
             try:
-                parsed_date = datetime.strptime(date_str, date_format)
+                parsed_date = datetime.strptime(date_str, "%Y-%m-%d")
                 iso_date = parsed_date.strftime("%Y-%m-%d")
             except ValueError:
+                logger.warning("Skipping transaction with invalid date: %s", date_str)
                 continue
 
-            # Parse amount - normalize
-            amount_str = amount_str.replace(",", "").replace(" ", "")
+            # Normalize amount
             try:
-                amount = Decimal(amount_str)
-            except (InvalidOperation, ValueError):
+                amount = Decimal(str(tx["amount"]))
+            except (InvalidOperation, ValueError, KeyError):
+                logger.warning("Skipping transaction with invalid amount: %s", tx.get("amount"))
                 continue
 
-            # Apply debit/credit sign
-            tx_type = row[type_col].strip() if type_col < len(row) else ""
-            if tx_type.lower() == debit_value.lower():
-                amount = -abs(amount)
-                tx_type_normalized = "debit"
-            elif tx_type.lower() == credit_value.lower():
-                amount = abs(amount)
-                tx_type_normalized = "credit"
-            else:
-                # If type isn't recognized, keep amount sign as-is
-                tx_type_normalized = "debit" if amount < 0 else "credit"
-
-            currency = row[currency_col].strip() if currency_col < len(row) else "USD"
+            currency = str(tx.get("currency", "EUR")).strip().upper()
+            tx_type = "debit" if amount < 0 else "credit"
 
             transactions.append({
                 "date": iso_date,
                 "description": description,
                 "amount": str(amount),
                 "currency": currency,
-                "type": tx_type_normalized,
+                "type": tx_type,
                 "reference": None,
             })
 
+        if not transactions:
+            raise ValueError("No valid transactions extracted from PDF")
+
         return transactions
+
+    def _extract_text_from_pdf(self, file_content: bytes) -> list[str]:
+        """Extract raw text from each PDF page using pdfplumber."""
+        import io
+
+        page_texts: list[str] = []
+
+        try:
+            with pdfplumber.open(io.BytesIO(file_content)) as pdf:
+                for i, page in enumerate(pdf.pages):
+                    text = page.extract_text()
+                    if text and text.strip():
+                        page_texts.append(text)
+                    else:
+                        logger.warning("Page %d: no extractable text, skipping", i + 1)
+        except Exception as e:
+            if "password" in str(e).lower() or "encrypted" in str(e).lower():
+                raise ValueError("Password-protected PDFs are not supported") from e
+            raise ValueError(f"Failed to read PDF: {e}") from e
+
+        return page_texts

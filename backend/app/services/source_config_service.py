@@ -2,6 +2,10 @@
 Source mapping config loader (T011).
 
 Loads and validates source_mappings.json for known PDF sources.
+
+NOTE: As of 003-llm-pdf-parsing, PDF imports use LLM-based text extraction
+instead of column-index mapping. This module is kept for potential future use
+with non-LLM formats but is no longer called during PDF import.
 """
 
 from __future__ import annotations
