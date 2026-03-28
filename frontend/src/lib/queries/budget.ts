@@ -215,6 +215,7 @@ export interface ImportProgress {
   total: number;
   done: number;
   result: ImportResponse | null;
+  importId: string | null;
   error: string | null;
   isProcessing: boolean;
 }
@@ -226,6 +227,7 @@ export function useImportWithProgress() {
     total: 0,
     done: 0,
     result: null,
+    importId: null,
     error: null,
     isProcessing: false,
   });
@@ -237,6 +239,7 @@ export function useImportWithProgress() {
         total: 0,
         done: 0,
         result: null,
+        importId: null,
         error: null,
         isProcessing: true,
       });
@@ -323,6 +326,7 @@ export function useImportWithProgress() {
                   total: 0,
                   done: 0,
                   result: evt.result,
+                  importId: evt.result?.id ?? null,
                   error: null,
                   isProcessing: false,
                 });
@@ -361,6 +365,7 @@ export function useImportWithProgress() {
       total: 0,
       done: 0,
       result: null,
+      importId: null,
       error: null,
       isProcessing: false,
     });
