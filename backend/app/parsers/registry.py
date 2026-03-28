@@ -12,6 +12,7 @@ class StatementFormat(str, Enum):
     CSV = "csv"
     OFX = "ofx"
     MT940 = "mt940"
+    PDF = "pdf"
 
 
 class ParsedRow:
@@ -40,11 +41,13 @@ def get_parser(fmt: StatementFormat) -> StatementParser:
     from app.parsers.csv_parser import CsvParser
     from app.parsers.mt940_parser import Mt940Parser
     from app.parsers.ofx_parser import OfxParser
+    from app.parsers.pdf_parser import PdfParser
 
     parsers: dict[StatementFormat, StatementParser] = {
         StatementFormat.CSV: CsvParser(),
         StatementFormat.OFX: OfxParser(),
         StatementFormat.MT940: Mt940Parser(),
+        StatementFormat.PDF: PdfParser(),
     }
 
     parser = parsers.get(fmt)

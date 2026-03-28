@@ -16,8 +16,9 @@ class StatementImport(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
-    format: Mapped[str] = mapped_column(String(10), nullable=False)  # csv, ofx, mt940
+    format: Mapped[str] = mapped_column(String(10), nullable=False)  # csv, ofx, mt940, pdf
     bank_profile_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("bank_profiles.id"), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(20), nullable=True)  # payoneer, monobank, millenium, other
     row_count: Mapped[int] = mapped_column(Integer, nullable=False)
     duplicate_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(20), nullable=False)  # parsing, preview, confirmed, discarded

@@ -1,10 +1,12 @@
 """
 Statement import service – parse, de-duplicate, preview, and confirm (T057).
+Extended for PDF imports with source config and categorization (T014, T019, T020).
 """
 
 from __future__ import annotations
 
 import hashlib
+import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -13,9 +15,12 @@ from sqlalchemy.orm import Session
 
 from app.models.bank_profile import BankProfile
 from app.models.budget_transaction import BudgetTransaction
+from app.models.category import Category
 from app.models.statement_import import StatementImport
 from app.parsers.registry import StatementFormat, get_parser
 from app.services.categorization_service import categorize_transaction
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -58,11 +63,12 @@ def create_import(
     fmt: str,
     bank_profile_id: str | None = None,
     currency: str = "EUR",
-) -> StatementImport:
+    source: str | None = None,
+    source_config: dict | None = None,
+) -> dict:
     """Parse a statement file and create a preview import.
 
-    Returns the StatementImport with associated BudgetTransaction rows
-    (not yet confirmed).
+    Returns a dict with import metadata, rows (with categorization info), and counts.
     """
     statement_format = StatementFormat(fmt)
 
@@ -78,6 +84,7 @@ def create_import(
         filename=filename,
         format=fmt,
         bank_profile_id=bank_profile_id,
+        source=source,
         row_count=0,
         duplicate_count=0,
         status="parsing",
@@ -87,7 +94,21 @@ def create_import(
 
     # Parse the file
     parser = get_parser(statement_format)
-    parsed_rows = parser.parse(file_content, bank_profile=bank_profile)
+
+    if statement_format == StatementFormat.PDF:
+        parsed_rows = parser.parse(file_content, bank_profile=bank_profile, source_config=source_config)
+    else:
+        parsed_rows = parser.parse(file_content, bank_profile=bank_profile)
+
+    # For PDF imports, run enhanced categorization
+    is_pdf = statement_format == StatementFormat.PDF
+    category_results: dict[int, dict] = {}
+
+    if is_pdf:
+        from app.services import categorization_service
+        category_results = categorization_service.categorize_transactions_batch(
+            db, user_id, [row.get("description", "") for row in parsed_rows]
+        )
 
     # Compute dedup hashes
     row_hashes = [
@@ -99,9 +120,11 @@ def create_import(
 
     # Create BudgetTransaction rows in preview state
     duplicate_count = 0
+    skipped_count = 0
     created_transactions: list[BudgetTransaction] = []
+    response_rows: list[dict] = []
 
-    for row, dedup_hash in zip(parsed_rows, row_hashes):
+    for idx, (row, dedup_hash) in enumerate(zip(parsed_rows, row_hashes)):
         is_duplicate = dedup_hash in existing
 
         if is_duplicate:
@@ -112,16 +135,32 @@ def create_import(
         try:
             amount = Decimal(row["amount"])
         except (InvalidOperation, ValueError):
+            skipped_count += 1
             continue
 
         # Parse date
         try:
             tx_date = datetime.strptime(row["date"], "%Y-%m-%d").date()
         except ValueError:
+            skipped_count += 1
             continue
 
-        # Try auto-categorization
-        category_id = categorize_transaction(db, user_id, row.get("description", ""))
+        # Determine category
+        category_id = None
+        category_name = None
+        category_source = "none"
+
+        if is_pdf and idx in category_results:
+            cat_result = category_results[idx]
+            category_id = cat_result.get("category_id")
+            category_name = cat_result.get("category_name")
+            category_source = cat_result.get("category_source", "none")
+        else:
+            # Legacy: keyword-only categorization for non-PDF
+            category_id = categorize_transaction(db, user_id, row.get("description", ""))
+
+        # Use currency from parsed row (PDF provides it per-row) or default
+        tx_currency = row.get("currency", currency)
 
         tx = BudgetTransaction(
             id=str(uuid.uuid4()),
@@ -131,13 +170,25 @@ def create_import(
             date=tx_date,
             description=row.get("description", ""),
             amount=amount,
-            currency=currency,
+            currency=tx_currency,
             reference=row.get("reference"),
             is_investment=False,
             dedup_hash=dedup_hash,
         )
         db.add(tx)
         created_transactions.append(tx)
+
+        response_rows.append({
+            "date": row["date"],
+            "description": row.get("description", ""),
+            "amount": amount,
+            "currency": tx_currency,
+            "type": row.get("type", "debit" if amount < 0 else "credit"),
+            "category_id": category_id,
+            "category_name": category_name,
+            "category_source": category_source,
+            "category_guess": category_name,  # backward compat for frontend
+        })
 
         # Track the hash so intra-file duplicates are also caught
         existing.add(dedup_hash)
@@ -148,7 +199,17 @@ def create_import(
 
     db.commit()
     db.refresh(import_record)
-    return import_record
+
+    return {
+        "id": import_record.id,
+        "status": import_record.status,
+        "file_name": filename,
+        "source": source,
+        "row_count": len(created_transactions),
+        "duplicate_count": duplicate_count,
+        "skipped_count": skipped_count,
+        "rows": response_rows,
+    }
 
 
 def get_import(db: Session, import_id: str) -> StatementImport | None:
@@ -160,45 +221,74 @@ def get_import(db: Session, import_id: str) -> StatementImport | None:
     )
 
 
-def confirm_import(db: Session, import_id: str) -> StatementImport | None:
-    """Mark an import as confirmed – its transactions become permanent."""
-    import_record = (
-        db.query(StatementImport)
-        .filter(StatementImport.id == import_id)
-        .first()
-    )
-    if import_record is None:
-        return None
+def confirm_import(
+    db: Session,
+    import_record: StatementImport,
+    category_overrides: list[dict] | None = None,
+) -> dict:
+    """Mark an import as confirmed – its transactions become permanent.
 
+    Applies any category overrides and saves mappings to the MD file.
+    """
     if import_record.status != "preview":
         raise ValueError(f"Cannot confirm import with status '{import_record.status}'")
+
+    # Load transactions for this import
+    transactions = (
+        db.query(BudgetTransaction)
+        .filter(BudgetTransaction.import_id == import_record.id)
+        .all()
+    )
+
+    # Apply category overrides
+    if category_overrides:
+        for override in category_overrides:
+            row_index = override.get("row_index")
+            new_category_id = override.get("category_id")
+            if row_index is not None and 0 <= row_index < len(transactions):
+                transactions[row_index].category_id = new_category_id
+
+    # Save description->category mappings to MD file
+    mappings_updated = 0
+    if import_record.format == "pdf":
+        from app.services.mapping_file_service import save_bulk_mappings
+
+        mappings: dict[str, str] = {}
+        for tx in transactions:
+            if tx.category_id and tx.description:
+                # Look up category name
+                cat = db.query(Category).filter(Category.id == tx.category_id).first()
+                if cat:
+                    mappings[tx.description.lower().strip()] = cat.name
+
+        if mappings:
+            mappings_updated = save_bulk_mappings(mappings)
 
     import_record.status = "confirmed"
     db.commit()
     db.refresh(import_record)
-    return import_record
+
+    return {
+        "id": import_record.id,
+        "status": "confirmed",
+        "row_count": import_record.row_count,
+        "mappings_updated": mappings_updated,
+    }
 
 
-def discard_import(db: Session, import_id: str) -> StatementImport | None:
+def discard_import(db: Session, import_record: StatementImport) -> dict:
     """Mark an import as discarded and remove its uncommitted transactions."""
-    import_record = (
-        db.query(StatementImport)
-        .filter(StatementImport.id == import_id)
-        .first()
-    )
-    if import_record is None:
-        return None
-
     if import_record.status != "preview":
         raise ValueError(f"Cannot discard import with status '{import_record.status}'")
 
     # Remove preview transactions
     db.query(BudgetTransaction).filter(
-        BudgetTransaction.import_id == import_id,
+        BudgetTransaction.import_id == import_record.id,
     ).delete(synchronize_session="fetch")
 
     import_record.status = "discarded"
     import_record.row_count = 0
     db.commit()
     db.refresh(import_record)
-    return import_record
+
+    return {"id": import_record.id, "status": "discarded"}
