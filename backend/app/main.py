@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -5,6 +7,8 @@ from app.api import (
     accounts, transactions, portfolio, categories, import_, budget, income,
     exchange_rates, cashflow, budget_charts, users, auth,
 )
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Finance Dashboard API", version="0.1.0")
 
@@ -28,6 +32,17 @@ app.include_router(exchange_rates.router)
 app.include_router(cashflow.router)
 app.include_router(budget_charts.router)
 app.include_router(users.router)
+
+
+@app.on_event("startup")
+def _validate_source_mappings():
+    """Validate source_mappings.json on startup (T035, FR-020)."""
+    from app.services.source_config_service import validate_config
+    is_valid, message = validate_config()
+    if not is_valid:
+        logger.warning("Source mappings validation: %s", message)
+    else:
+        logger.info("Source mappings validation: %s", message)
 
 
 @app.get("/api/v1/health")

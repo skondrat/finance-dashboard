@@ -97,9 +97,26 @@ class BudgetTransactionResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class ImportRowResponse(BaseModel):
+    date: str
+    description: str
+    amount: Decimal
+    currency: str
+    type: str = "debit"
+    category_id: Optional[str] = None
+    category_name: Optional[str] = None
+    category_source: str = "none"  # mapping, rule, ai, none
+
+
 class ImportUploadResponse(BaseModel):
-    import_id: str
+    id: str
     status: str
+    file_name: str
+    source: Optional[str] = None
+    row_count: int
+    duplicate_count: int
+    skipped_count: int = 0
+    rows: list[ImportRowResponse]
 
 
 class ImportDetailResponse(BaseModel):
@@ -109,6 +126,21 @@ class ImportDetailResponse(BaseModel):
     row_count: int
     duplicate_count: int
     rows: Optional[list[dict[str, Any]]] = None
+
+
+class ConfirmImportRequest(BaseModel):
+    category_overrides: Optional[list[dict[str, Any]]] = None
+
+
+class ImportCategoryResponse(BaseModel):
+    id: str
+    name: str
+    color: str
+
+
+class SeedCategoriesResponse(BaseModel):
+    categories_loaded: int
+    examples_loaded: int
 
 
 # ---------------------------------------------------------------------------

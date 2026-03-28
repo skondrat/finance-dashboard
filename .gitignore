@@ -36,6 +36,10 @@ Thumbs.db
 # Database
 *.db
 data/
+!backend/data/
+backend/data/*
+!backend/data/source_mappings.json
+!backend/data/category_mappings.md
 
 # Testing
 coverage/

@@ -5,17 +5,86 @@ import { useDropzone } from "react-dropzone";
 import {
   useImportUpload,
   useConfirmImport,
+  useImportCategories,
+  useSeedCategoriesUpload,
   type ImportResponse,
+  type ImportRow,
+  type CategoryOverride,
+  type ImportCategory,
 } from "@/lib/queries/budget";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useCurrencyStore } from "@/stores/currency-store";
 
+const SOURCES = [
+  { value: "payoneer", label: "Payoneer" },
+  { value: "monobank", label: "Monobank" },
+  { value: "millenium", label: "Millenium" },
+  { value: "other", label: "Other" },
+] as const;
+
+function CategorySourceBadge({ source }: { source: string }) {
+  const colors: Record<string, string> = {
+    mapping: "bg-on-tertiary-container/10 text-on-tertiary-container",
+    rule: "bg-on-secondary-container/10 text-on-secondary-container",
+    ai: "bg-on-primary-container/10 text-on-primary-container",
+    none: "bg-on-surface-variant/10 text-on-surface-variant",
+  };
+  const labels: Record<string, string> = {
+    mapping: "map",
+    rule: "rule",
+    ai: "ai",
+    none: "",
+  };
+  if (source === "none") return null;
+  return (
+    <span
+      className={cn(
+        "ml-1 inline-block rounded px-1 py-0.5 font-mono text-[10px] uppercase",
+        colors[source] ?? colors.none
+      )}
+    >
+      {labels[source] ?? source}
+    </span>
+  );
+}
+
+function CategorySelector({
+  categories,
+  selectedId,
+  onChange,
+}: {
+  categories: ImportCategory[];
+  selectedId: string | null;
+  onChange: (id: string | null) => void;
+}) {
+  return (
+    <select
+      className="w-full max-w-32 rounded border border-on-surface-variant/20 bg-surface-container-lowest px-1.5 py-1 font-mono text-xs text-on-surface"
+      value={selectedId ?? ""}
+      onChange={(e) => onChange(e.target.value || null)}
+    >
+      <option value="">-- None --</option>
+      {categories.map((cat) => (
+        <option key={cat.id} value={cat.id}>
+          {cat.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function PreviewTable({
   data,
   currency,
+  categories,
+  overrides,
+  onOverride,
 }: {
   data: ImportResponse;
   currency: string;
+  categories: ImportCategory[];
+  overrides: Map<number, string | null>;
+  onOverride: (rowIndex: number, categoryId: string | null) => void;
 }) {
   return (
     <div className="max-h-72 overflow-y-auto">
@@ -31,40 +100,152 @@ function PreviewTable({
             <th className="pb-2 text-right font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
               Amount
             </th>
+            {data.source && (
+              <>
+                <th className="pb-2 text-left font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
+                  Cur
+                </th>
+                <th className="pb-2 text-left font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
+                  Type
+                </th>
+              </>
+            )}
             <th className="pb-2 text-left font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
               Category
             </th>
           </tr>
         </thead>
         <tbody>
-          {data.rows.map((row, idx) => (
-            <tr
-              key={idx}
-              className="border-b border-on-surface-variant/5 last:border-0"
-            >
-              <td className="py-2 font-mono text-xs text-on-surface">
-                {row.date}
-              </td>
-              <td className="py-2 font-body text-sm text-on-surface max-w-48 truncate">
-                {row.description}
-              </td>
-              <td
-                className={cn(
-                  "py-2 text-right font-mono text-sm",
-                  row.amount < 0
-                    ? "text-on-error-container"
-                    : "text-on-tertiary-container"
-                )}
+          {data.rows.map((row, idx) => {
+            const overriddenCatId = overrides.get(idx);
+            const currentCatId =
+              overriddenCatId !== undefined
+                ? overriddenCatId
+                : row.category_id;
+            const currentCatName =
+              overriddenCatId !== undefined
+                ? categories.find((c) => c.id === overriddenCatId)?.name ??
+                  null
+                : row.category_name;
+
+            return (
+              <tr
+                key={idx}
+                className="border-b border-on-surface-variant/5 last:border-0"
               >
-                {formatCurrency(row.amount, currency)}
-              </td>
-              <td className="py-2 font-mono text-xs text-on-surface-variant">
-                {row.category_guess ?? "\u2014"}
-              </td>
-            </tr>
-          ))}
+                <td className="py-2 font-mono text-xs text-on-surface">
+                  {row.date}
+                </td>
+                <td className="py-2 font-body text-sm text-on-surface max-w-48 truncate">
+                  {row.description}
+                </td>
+                <td
+                  className={cn(
+                    "py-2 text-right font-mono text-sm",
+                    row.amount < 0
+                      ? "text-on-error-container"
+                      : "text-on-tertiary-container"
+                  )}
+                >
+                  {formatCurrency(row.amount, row.currency || currency)}
+                </td>
+                {data.source && (
+                  <>
+                    <td className="py-2 font-mono text-xs text-on-surface-variant">
+                      {row.currency}
+                    </td>
+                    <td className="py-2 font-mono text-xs text-on-surface-variant capitalize">
+                      {row.type}
+                    </td>
+                  </>
+                )}
+                <td className="py-2">
+                  {categories.length > 0 ? (
+                    <div className="flex items-center">
+                      <CategorySelector
+                        categories={categories}
+                        selectedId={currentCatId}
+                        onChange={(id) => onOverride(idx, id)}
+                      />
+                      <CategorySourceBadge
+                        source={
+                          overriddenCatId !== undefined
+                            ? "mapping"
+                            : row.category_source
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <span className="font-mono text-xs text-on-surface-variant">
+                      {currentCatName ?? "\u2014"}
+                      {row.category_source !== "none" && (
+                        <CategorySourceBadge source={row.category_source} />
+                      )}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function SeedCategoriesUpload({
+  onComplete,
+}: {
+  onComplete: () => void;
+}) {
+  const seedMutation = useSeedCategoriesUpload();
+
+  const { getRootProps, getInputProps } = useDropzone({
+    onDrop: (files) => {
+      const file = files[0];
+      if (!file) return;
+      seedMutation.mutate(file, { onSuccess: onComplete });
+    },
+    accept: { "text/csv": [".csv"] },
+    multiple: false,
+  });
+
+  return (
+    <div className="space-y-3">
+      <p className="font-body text-sm text-on-surface-variant">
+        No categories found. Upload a seed categories CSV to get started.
+      </p>
+      <div
+        {...getRootProps()}
+        className="flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl outline-2 outline-dashed outline-on-surface-variant/40 transition-colors hover:bg-surface-container-low"
+      >
+        <input {...getInputProps()} />
+        <p className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
+          Drop CSV here
+        </p>
+      </div>
+      {seedMutation.isPending && (
+        <p className="text-center font-mono text-xs text-on-surface-variant animate-pulse">
+          Uploading...
+        </p>
+      )}
+      {seedMutation.isError && (
+        <p className="text-center font-mono text-xs text-on-error-container">
+          {seedMutation.error.message}
+        </p>
+      )}
+      {seedMutation.isSuccess && (
+        <p className="text-center font-mono text-xs text-on-tertiary-container">
+          Loaded {seedMutation.data.categories_loaded} categories,{" "}
+          {seedMutation.data.examples_loaded} examples
+        </p>
+      )}
+      <button
+        onClick={onComplete}
+        className="w-full rounded-xl px-4 py-2 font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:text-on-surface"
+      >
+        Skip for now
+      </button>
     </div>
   );
 }
@@ -72,54 +253,138 @@ function PreviewTable({
 export function ImportModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [preview, setPreview] = useState<ImportResponse | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string>("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showSeedUpload, setShowSeedUpload] = useState(false);
+  const [overrides, setOverrides] = useState<Map<number, string | null>>(
+    new Map()
+  );
   const currency = useCurrencyStore((s) => s.currency);
 
   const uploadMutation = useImportUpload();
   const confirmMutation = useConfirmImport();
+  const { data: categoriesData } = useImportCategories();
+  const categories = categoriesData?.categories ?? [];
+
+  const isPdf = selectedFile?.name?.toLowerCase().endsWith(".pdf") ?? false;
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       const file = acceptedFiles[0];
       if (!file) return;
+      setSelectedFile(file);
 
-      uploadMutation.mutate(file, {
-        onSuccess: (data) => {
-          setPreview(data);
-        },
-      });
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      if (ext === "pdf") {
+        // Wait for source selection before uploading
+        return;
+      }
+
+      // Non-PDF: upload immediately
+      uploadMutation.mutate(
+        { file },
+        {
+          onSuccess: (data) => {
+            setPreview(data);
+          },
+        }
+      );
     },
     [uploadMutation]
   );
+
+  function handleUploadPdf() {
+    if (!selectedFile || !selectedSource) return;
+
+    uploadMutation.mutate(
+      { file: selectedFile, source: selectedSource },
+      {
+        onSuccess: (data) => {
+          setPreview(data);
+          setOverrides(new Map());
+        },
+      }
+    );
+  }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       "text/csv": [".csv"],
+      "application/pdf": [".pdf"],
       "application/octet-stream": [".ofx", ".mt940"],
     },
     multiple: false,
   });
 
+  function handleOverride(rowIndex: number, categoryId: string | null) {
+    setOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(rowIndex, categoryId);
+      return next;
+    });
+  }
+
   function handleConfirm() {
     if (!preview) return;
-    confirmMutation.mutate(preview.id, {
-      onSuccess: () => {
-        setPreview(null);
-        setIsOpen(false);
-      },
+
+    const categoryOverrides: CategoryOverride[] = [];
+    overrides.forEach((catId, rowIndex) => {
+      if (catId !== null) {
+        categoryOverrides.push({ row_index: rowIndex, category_id: catId });
+      }
     });
+
+    confirmMutation.mutate(
+      {
+        importId: preview.id,
+        categoryOverrides:
+          categoryOverrides.length > 0 ? categoryOverrides : undefined,
+      },
+      {
+        onSuccess: () => {
+          setPreview(null);
+          setOverrides(new Map());
+          setSelectedFile(null);
+          setSelectedSource("");
+          setIsOpen(false);
+        },
+      }
+    );
   }
 
   function handleDiscard() {
     setPreview(null);
+    setOverrides(new Map());
+    setSelectedFile(null);
+    setSelectedSource("");
     uploadMutation.reset();
   }
 
   function handleClose() {
     setPreview(null);
+    setOverrides(new Map());
+    setSelectedFile(null);
+    setSelectedSource("");
+    setShowSeedUpload(false);
     uploadMutation.reset();
     setIsOpen(false);
   }
+
+  // Parse error detail from API
+  const errorMessage = uploadMutation.isError
+    ? (() => {
+        try {
+          const parsed = JSON.parse(uploadMutation.error.message);
+          if (parsed.message && parsed.action) {
+            return `${parsed.message} ${parsed.action}`;
+          }
+        } catch {
+          // not JSON
+        }
+        return uploadMutation.error.message;
+      })()
+    : null;
 
   return (
     <>
@@ -139,12 +404,16 @@ export function ImportModal() {
           />
 
           {/* Modal */}
-          <div className="relative z-10 w-full max-w-2xl mx-4 rounded-2xl bg-surface-container-lowest/80 backdrop-blur-[20px] p-6 shadow-ambient">
+          <div className="relative z-10 w-full max-w-3xl mx-4 rounded-2xl bg-surface-container-lowest/80 backdrop-blur-[20px] p-6 shadow-ambient">
             <h2 className="font-display text-xl font-medium text-on-surface mb-4">
               Import Statement
             </h2>
 
-            {!preview ? (
+            {showSeedUpload ? (
+              <SeedCategoriesUpload
+                onComplete={() => setShowSeedUpload(false)}
+              />
+            ) : !preview ? (
               <>
                 {/* Dropzone */}
                 <div
@@ -158,32 +427,124 @@ export function ImportModal() {
                 >
                   <input {...getInputProps()} />
                   <p className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
-                    Drop CSV / OFX / MT940
+                    Drop CSV / OFX / MT940 / PDF
                   </p>
                   <p className="mt-2 font-body text-xs text-on-surface-variant/60">
                     or click to browse
                   </p>
                 </div>
 
-                {uploadMutation.isPending && (
+                {/* Source selector for PDF */}
+                {isPdf && selectedFile && !preview && (
+                  <div className="mt-4 space-y-3">
+                    <p className="font-mono text-xs text-on-surface-variant">
+                      PDF detected: <span className="text-on-surface">{selectedFile.name}</span>
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <label className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
+                        Source:
+                      </label>
+                      <select
+                        className="flex-1 rounded-xl border border-on-surface-variant/20 bg-surface-container-lowest px-3 py-2 font-mono text-sm text-on-surface"
+                        value={selectedSource}
+                        onChange={(e) => setSelectedSource(e.target.value)}
+                      >
+                        <option value="">Select source...</option>
+                        {SOURCES.map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleUploadPdf}
+                        disabled={!selectedSource || uploadMutation.isPending}
+                        className="rounded-xl bg-on-surface px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-surface transition-colors hover:bg-on-surface/90 disabled:opacity-50"
+                      >
+                        {uploadMutation.isPending
+                          ? "Processing..."
+                          : "Upload"}
+                      </button>
+                    </div>
+                    {selectedSource === "other" && (
+                      <p className="font-body text-xs text-on-surface-variant/60">
+                        AI will attempt to detect column layout automatically.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {uploadMutation.isPending && !isPdf && (
                   <p className="mt-4 text-center font-mono text-xs text-on-surface-variant animate-pulse">
                     Uploading...
                   </p>
                 )}
 
-                {uploadMutation.isError && (
+                {errorMessage && (
                   <p className="mt-4 text-center font-mono text-xs text-on-error-container">
-                    {uploadMutation.error.message}
+                    {errorMessage}
                   </p>
                 )}
+
+                {/* Seed categories link */}
+                <div className="mt-3 flex items-center justify-center gap-1.5">
+                  <button
+                    onClick={() => setShowSeedUpload(true)}
+                    className="font-mono text-xs text-on-surface-variant/60 transition-colors hover:text-on-surface-variant"
+                  >
+                    Upload seed categories CSV
+                  </button>
+                  <div className="group relative">
+                    <span className="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-on-surface-variant/30 font-mono text-[10px] leading-none text-on-surface-variant/50 transition-colors group-hover:border-on-surface-variant group-hover:text-on-surface-variant">
+                      i
+                    </span>
+                    <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg bg-on-surface px-3 py-2 text-left opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                      <p className="font-mono text-[11px] leading-relaxed text-surface">
+                        CSV with two columns:<br />
+                        <span className="text-surface/70">Categories</span> — category name (required)<br />
+                        <span className="text-surface/70">Examples</span> — descriptions, pipe-separated (optional)<br />
+                        <br />
+                        <span className="text-surface/50">e.g. Food &amp; Dining,uber eats|mcdonalds</span>
+                      </p>
+                      <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-on-surface" />
+                    </div>
+                  </div>
+                </div>
               </>
             ) : (
               <>
                 {/* Preview */}
-                <p className="mb-3 font-mono text-xs text-on-surface-variant">
-                  {preview.file_name} &mdash; {preview.rows.length} transactions
-                </p>
-                <PreviewTable data={preview} currency={currency} />
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="font-mono text-xs text-on-surface-variant">
+                    {preview.file_name} &mdash; {preview.rows.length}{" "}
+                    transactions
+                    {preview.duplicate_count > 0 && (
+                      <span>
+                        {" "}
+                        ({preview.duplicate_count} duplicates skipped)
+                      </span>
+                    )}
+                    {preview.skipped_count > 0 && (
+                      <span>
+                        {" "}
+                        ({preview.skipped_count} rows skipped)
+                      </span>
+                    )}
+                  </p>
+                  {preview.source && (
+                    <span className="rounded-lg bg-on-surface-variant/10 px-2 py-1 font-mono text-xs uppercase text-on-surface-variant">
+                      {preview.source}
+                    </span>
+                  )}
+                </div>
+
+                <PreviewTable
+                  data={preview}
+                  currency={currency}
+                  categories={categories}
+                  overrides={overrides}
+                  onOverride={handleOverride}
+                />
 
                 {/* Actions */}
                 <div className="mt-6 flex items-center justify-end gap-3">
@@ -199,7 +560,9 @@ export function ImportModal() {
                     disabled={confirmMutation.isPending}
                     className="rounded-xl bg-on-surface px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-surface transition-colors hover:bg-on-surface/90 disabled:opacity-50"
                   >
-                    {confirmMutation.isPending ? "Confirming..." : "Confirm Import"}
+                    {confirmMutation.isPending
+                      ? "Confirming..."
+                      : "Confirm Import"}
                   </button>
                 </div>
 

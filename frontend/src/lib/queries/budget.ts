@@ -52,15 +52,43 @@ export interface IncomeSource {
   month: number;
 }
 
+export interface ImportRow {
+  date: string;
+  description: string;
+  amount: number;
+  currency: string;
+  type: string;
+  category_id: string | null;
+  category_name: string | null;
+  category_source: string;
+  category_guess: string | null;
+}
+
 export interface ImportResponse {
   id: string;
-  rows: Array<{
-    date: string;
-    description: string;
-    amount: number;
-    category_guess: string | null;
-  }>;
+  status: string;
   file_name: string;
+  source: string | null;
+  row_count: number;
+  duplicate_count: number;
+  skipped_count: number;
+  rows: ImportRow[];
+}
+
+export interface ImportCategory {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface CategoryOverride {
+  row_index: number;
+  category_id: string;
+}
+
+export interface UploadParams {
+  file: File;
+  source?: string;
 }
 
 export function useBudgetSummary(
@@ -161,10 +189,13 @@ export function useIncomes(year?: number, month?: number) {
 export function useImportUpload() {
   const queryClient = useQueryClient();
 
-  return useMutation<ImportResponse, Error, File>({
-    mutationFn: (file) => {
+  return useMutation<ImportResponse, Error, UploadParams>({
+    mutationFn: ({ file, source }) => {
       const formData = new FormData();
       formData.append("file", file);
+      if (source) {
+        formData.append("source", source);
+      }
 
       return apiFetch<ImportResponse>("/budget/import/upload", {
         method: "POST",
@@ -181,11 +212,51 @@ export function useImportUpload() {
 export function useConfirmImport() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, string>({
-    mutationFn: (importId) =>
-      apiFetch<void>(`/budget/import/${importId}/confirm`, {
+  return useMutation<
+    { id: string; status: string; row_count: number; mappings_updated: number },
+    Error,
+    { importId: string; categoryOverrides?: CategoryOverride[] }
+  >({
+    mutationFn: ({ importId, categoryOverrides }) =>
+      apiFetch(`/budget/import/${importId}/confirm`, {
         method: "POST",
+        body: JSON.stringify({
+          category_overrides: categoryOverrides ?? null,
+        }),
       }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
+    },
+  });
+}
+
+export function useImportCategories() {
+  return useQuery<{ categories: ImportCategory[] }>({
+    queryKey: ["budget", "import-categories"],
+    queryFn: () =>
+      apiFetch<{ categories: ImportCategory[] }>(
+        "/budget/import/categories"
+      ),
+  });
+}
+
+export function useSeedCategoriesUpload() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { categories_loaded: number; examples_loaded: number },
+    Error,
+    File
+  >({
+    mutationFn: (file) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return apiFetch("/budget/import/seed-categories", {
+        method: "POST",
+        body: formData,
+        headers: {},
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budget"] });
     },
