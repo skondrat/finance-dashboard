@@ -14,6 +14,7 @@ import {
   type ImportCategory,
 } from "@/lib/queries/budget";
 import { cn, formatCurrency } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 import { useCurrencyStore } from "@/stores/currency-store";
 
 const SOURCES = [
@@ -351,7 +352,17 @@ export function ImportModal() {
     );
   }
 
+  function discardOnBackend() {
+    const importId = preview?.id ?? sseProgress.importId;
+    if (importId) {
+      apiFetch(`/budget/import/${importId}/discard`, { method: "POST" }).catch(
+        (err) => console.error("Failed to discard import:", err)
+      );
+    }
+  }
+
   function handleDiscard() {
+    discardOnBackend();
     setPreview(null);
     setOverrides(new Map());
     setSelectedFile(null);
@@ -361,6 +372,9 @@ export function ImportModal() {
   }
 
   function handleClose() {
+    if (preview || sseProgress.result) {
+      discardOnBackend();
+    }
     setPreview(null);
     setOverrides(new Map());
     setSelectedFile(null);
