@@ -5,10 +5,6 @@
 
 ## Issues
 
-- **Discard button doesn't call backend API** — The frontend `handleDiscard` in `import-modal.tsx` only resets client-side state but never calls `POST /budget/import/{id}/discard`. This leaves orphaned preview transactions in the DB. On a subsequent import of the same PDF, all transactions show as "duplicates skipped" because the old preview transactions still have dedup hashes in the DB. The SSE flow makes this worse because `handleDiscard` doesn't even have the import ID (the SSE result contains it, but it's only set in `preview` state after completion).
-
-- **40 out of 101 transactions are uncategorized** — Many common transactions that should match existing categories remain uncategorized (e.g., MERCADONA → Groceries, EL CORTE INGLES → Shopping, Preply → Education, IHERB.COM → Supplements, CONTINENTE → Groceries). The AI categorization assigned these correctly for *some* instances but missed others with the same description. This is because `suggest_category_async` makes independent calls per transaction without context of what was already categorized — the same description can get different results.
-
 - **"Other" category is a catch-all with €4,690 (50.7% of total spend)** — Large ATM withdrawals (Optica Mutualista €2,027, New Souvenires €1,371 + €1,017) are categorized as "Other" which is unhelpful. These are likely rent/cash payments that should be specifically categorized or at least flagged for user review. The "Other" default category from the system absorbs too many transactions.
 
 - **Feb 28 transaction included in March statement** — The Payoneer PDF includes a Feb 28, 2026 transaction (MERCADONA -€26.87) which the LLM correctly extracted. It shows in the March view because the budget filters by import date, not transaction date. This is technically correct behavior (it was in the March statement) but may be confusing to the user.
