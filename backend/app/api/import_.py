@@ -75,15 +75,16 @@ async def upload_import(
                 detail={"error_type": "missing_source", "message": "Source is required for PDF imports.", "action": "Select a source (Payoneer, Monobank, Millenium, or Other)."},
             )
 
-        if source.lower() != "other":
-            from app.services.source_config_service import get_source_config
-            try:
-                source_config = get_source_config(source)
-            except (FileNotFoundError, ValueError) as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail={"error_type": "invalid_source", "message": str(e), "action": "Check source_mappings.json configuration."},
-                )
+        # LLM is required for all PDF imports
+        from app.services import llm_service
+        if not llm_service.is_available():
+            raise HTTPException(
+                status_code=503,
+                detail={"error_type": "ai_unavailable", "message": "AI service is required for PDF imports.", "action": "Set ANTHROPIC_API_KEY in your environment."},
+            )
+
+        # Pass source as a hint to the LLM-based parser
+        source_config = {"source_hint": source}
 
     file_content = await file.read()
 
@@ -93,41 +94,6 @@ async def upload_import(
             status_code=400,
             detail={"error_type": "file_too_large", "message": "PDF file exceeds 10 MB size limit.", "action": "Upload a smaller PDF file."},
         )
-
-    # For "other" source, use AI to determine column mapping
-    if fmt == "pdf" and source and source.lower() == "other":
-        from app.services import llm_service
-        if not llm_service.is_available():
-            raise HTTPException(
-                status_code=503,
-                detail={"error_type": "ai_unavailable", "message": "AI service is unavailable.", "action": "Set ANTHROPIC_API_KEY in your environment."},
-            )
-
-        # Extract tables for AI mapping
-        from app.parsers.pdf_parser import PdfParser
-        temp_parser = PdfParser()
-        try:
-            raw_rows = temp_parser._extract_tables(file_content, {"table_index": 0})
-        except ValueError as e:
-            raise HTTPException(
-                status_code=400,
-                detail={"error_type": "invalid_pdf", "message": str(e), "action": "Ensure the PDF contains valid, extractable tables."},
-            )
-
-        if not raw_rows:
-            raise HTTPException(
-                status_code=422,
-                detail={"error_type": "no_tables", "message": "No extractable tables found in PDF.", "action": "Ensure the PDF contains table data."},
-            )
-
-        # Send header + first 5 rows to AI
-        sample = raw_rows[:6]
-        source_config = llm_service.suggest_column_mapping(sample)
-        if source_config is None:
-            raise HTTPException(
-                status_code=422,
-                detail={"error_type": "mapping_failed", "message": "Could not determine column mapping for this PDF.", "action": "Try uploading with a known source, or verify the PDF contains a clear table."},
-            )
 
     try:
         result = import_service.create_import(
@@ -147,10 +113,10 @@ async def upload_import(
                 status_code=400,
                 detail={"error_type": "password_protected", "message": error_msg, "action": "Remove password protection from the PDF."},
             )
-        if "no extractable tables" in error_msg.lower():
+        if "no extractable" in error_msg.lower() or "failed to extract" in error_msg.lower():
             raise HTTPException(
                 status_code=422,
-                detail={"error_type": "no_tables", "message": error_msg, "action": "Ensure the PDF contains table data."},
+                detail={"error_type": "no_tables", "message": error_msg, "action": "Ensure the PDF contains readable transaction data."},
             )
         raise HTTPException(
             status_code=400,

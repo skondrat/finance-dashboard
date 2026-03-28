@@ -8,6 +8,7 @@ import json
 import logging
 
 import anthropic
+import pydantic
 
 from app.config import settings
 
@@ -177,4 +178,93 @@ Column indices are 0-based. For date_format, use Python strftime format (e.g., "
             return None
     except (json.JSONDecodeError, Exception):
         logger.exception("LLM suggest_column_mapping failed")
+        return None
+
+
+class _Transaction(pydantic.BaseModel):
+    """A single transaction extracted from a bank statement."""
+    date: str = pydantic.Field(description="Transaction date in YYYY-MM-DD format")
+    description: str = pydantic.Field(description="Full transaction description as it appears in the statement")
+    amount: float = pydantic.Field(description="Transaction amount: negative for debits/charges, positive for credits")
+    currency: str = pydantic.Field(description="3-letter ISO currency code (e.g., EUR, USD)")
+
+
+class _TransactionList(pydantic.BaseModel):
+    """List of transactions extracted from a bank statement."""
+    transactions: list[_Transaction]
+
+
+def extract_transactions_from_text(
+    page_texts: list[str],
+    source_hint: str | None = None,
+) -> list[dict] | None:
+    """Extract structured transactions from PDF text using the LLM.
+
+    Uses Anthropic's structured output (messages.parse + Pydantic model)
+    to get validated transaction data directly.
+
+    Args:
+        page_texts: List of text strings, one per PDF page.
+        source_hint: Optional bank name for context (e.g., "payoneer").
+
+    Returns:
+        List of transaction dicts with keys: date, description, amount, currency.
+        Returns None on failure.
+    """
+    if not is_available():
+        return None
+
+    combined_text = "\n\n--- Page Break ---\n\n".join(page_texts)
+
+    source_context = ""
+    if source_hint and source_hint.lower() != "other":
+        source_context = f"This is a {source_hint} bank statement. "
+
+    prompt = (
+        f"You are a financial statement parser. {source_context}"
+        "Extract ALL transactions from the following bank statement text.\n\n"
+        "Important rules:\n"
+        "- Include every transaction row, do not skip any\n"
+        "- Preserve the full original description text (including prefixes like 'Card charge', 'ATM withdrawal', etc.)\n"
+        "- Convert dates to YYYY-MM-DD regardless of the source format\n"
+        "- Use negative amounts for debits/charges/withdrawals, positive for credits/deposits/transfers in\n"
+        "- Do NOT include header rows, footer text, running balances, or summary rows\n"
+        "- If a row is clearly not a transaction (e.g., page header, copyright notice), skip it\n\n"
+        f"Statement text:\n{combined_text}"
+    )
+
+    def _call_llm() -> list[dict] | None:
+        client = _get_client()
+        response = client.messages.parse(
+            model=settings.LLM_MODEL,
+            max_tokens=16000,
+            timeout=120.0,
+            messages=[{"role": "user", "content": prompt}],
+            output_format=_TransactionList,
+        )
+
+        # Log token usage
+        logger.info(
+            "LLM extract_transactions: input_tokens=%d, output_tokens=%d",
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+        )
+
+        parsed = response.parsed_output
+        if not parsed or not parsed.transactions:
+            return None
+
+        return [tx.model_dump() for tx in parsed.transactions]
+
+    try:
+        return _call_llm()
+    except (anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
+        logger.warning("LLM extract_transactions failed, retrying: %s", e)
+        try:
+            return _call_llm()
+        except Exception:
+            logger.error("LLM extract_transactions retry also failed")
+            return None
+    except Exception:
+        logger.exception("LLM extract_transactions failed")
         return None
