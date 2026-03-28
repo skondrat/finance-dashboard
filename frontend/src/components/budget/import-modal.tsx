@@ -317,9 +317,29 @@ export function ImportModal() {
   });
 
   function handleOverride(rowIndex: number, categoryId: string | null) {
+    const rows = preview?.rows ?? sseProgress.result?.rows;
+
     setOverrides((prev) => {
       const next = new Map(prev);
       next.set(rowIndex, categoryId);
+
+      // Auto-match: propagate to other uncategorized rows with same description
+      if (categoryId && rows) {
+        const desc = rows[rowIndex]?.description?.toLowerCase();
+        if (desc) {
+          rows.forEach((row, idx) => {
+            if (
+              idx !== rowIndex &&
+              row.description?.toLowerCase() === desc &&
+              row.category_source === "none" &&
+              !prev.has(idx)
+            ) {
+              next.set(idx, categoryId);
+            }
+          });
+        }
+      }
+
       return next;
     });
   }
