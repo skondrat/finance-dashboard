@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user_id
 from app.database import get_db
 from app.models.auto_cat_rule import AutoCatRule
+from app.models.budget_transaction import BudgetTransaction
 from app.models.category import Category
 from app.schemas.budget import (
     AutoCatRuleCreate,
@@ -96,6 +97,45 @@ def update_category(
     db.commit()
     db.refresh(category)
     return category
+
+
+# ---------------------------------------------------------------------------
+# Delete category
+# ---------------------------------------------------------------------------
+
+
+@router.delete(
+    "/budget/categories/{category_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_category(
+    category_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Delete a category. Fails if the category has associated transactions."""
+    category = (
+        db.query(Category)
+        .filter(Category.id == category_id, Category.user_id == user_id)
+        .first()
+    )
+    if category is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    has_transactions = (
+        db.query(BudgetTransaction)
+        .filter(BudgetTransaction.category_id == category_id)
+        .first()
+        is not None
+    )
+    if has_transactions:
+        raise HTTPException(
+            status_code=409,
+            detail="Category has transactions and cannot be deleted",
+        )
+
+    db.delete(category)
+    db.commit()
 
 
 # ---------------------------------------------------------------------------
