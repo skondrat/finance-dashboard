@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     FINNHUB_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
-    LLM_MODEL: str = "claude-sonnet-4-6"
+    LLM_MODEL: str = "claude-haiku-4-5"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

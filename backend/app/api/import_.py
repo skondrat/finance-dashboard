@@ -583,3 +583,37 @@ def debug_reset(
         "categories_deleted": cats,
         "imports_deleted": imps,
     }
+
+
+# ---------------------------------------------------------------------------
+# Debug – LLM model selector
+# ---------------------------------------------------------------------------
+
+AVAILABLE_MODELS = ["claude-haiku-4-5", "claude-sonnet-4-6"]
+
+
+@router.get("/budget/debug/model", status_code=status.HTTP_200_OK)
+def get_llm_model():
+    """Return the currently active LLM model and available options."""
+    from app.services import llm_service
+
+    return {
+        "model": llm_service.get_model(),
+        "available_models": AVAILABLE_MODELS,
+    }
+
+
+@router.put("/budget/debug/model", status_code=status.HTTP_200_OK)
+def set_llm_model(payload: dict):
+    """Set the active LLM model."""
+    from app.services import llm_service
+
+    model = payload.get("model")
+    if model not in AVAILABLE_MODELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid model. Must be one of: {', '.join(AVAILABLE_MODELS)}",
+        )
+
+    llm_service.set_model(model)
+    return {"model": model}
