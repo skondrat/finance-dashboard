@@ -1,50 +1,51 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# Finance Dashboard Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Feature Delivery Workflow
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+When the user specifies a feature (or list of features), execute this end-to-end pipeline for each:
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+1. **Checkout & pull main** — `git checkout main && git pull origin main`
+2. **Specify** — `/speckit.specify` with the feature description. Write the spec, create the checklist, validate.
+3. **Plan** — `/speckit.plan`. Write plan.md, research.md, quickstart.md, data-model.md (if needed), contracts/ (if needed). Run agent context update.
+4. **Tasks** — `/speckit.tasks`. Generate tasks.md with implementation tasks.
+5. **Implement** — `/speckit.implement`. Execute all tasks, mark each done in tasks.md.
+6. **Test** — Start backend + frontend servers, test manually with browser MCP (Playwright). Take screenshots as evidence.
+7. **Commit** — Stage only feature-related files, commit with descriptive message.
+8. **Push & PR** — `git push -u origin <branch>`, create PR with `gh pr create`.
+9. **Merge** — `gh pr merge <number> --merge`.
+10. **Mark done** — Update ideas.md (strikethrough + PR number) if the feature came from the backlog.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+If multiple features are specified as one batch, combine them into a single spec/branch. Otherwise, execute each as a separate branch with its own full cycle.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### II. Combine Small Related Features
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+When the user groups related features (e.g., "do the budget UI improvements in one spec"), combine them into a single branch/spec. Each becomes a separate user story within the spec.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### III. Always Test with Browser
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+After implementation, always start both servers and verify with Playwright MCP before committing. Don't skip this step or mark it as "verified via code review" unless the test infrastructure genuinely can't support it (e.g., requires specific external services).
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### IV. Ideas Tracking
+
+The file `ideas.md` at the repo root is the feature backlog. When completing a feature from this list, mark it with strikethrough and the PR number: `~~feature text~~ (DONE - PR #N)`.
+
+### V. Git Hygiene
+
+- Always start from latest main
+- One branch per feature (or feature group)
+- Commit, push, create PR, merge — don't leave branches hanging
+- Pull main after merge before starting next feature
+
+### VI. Keep It Simple
+
+- Skip speckit steps that add no value for trivial changes (e.g., a 1-file backend fix doesn't need data-model.md or contracts/)
+- Don't create unnecessary abstractions or over-engineer
+- Frontend-only changes don't need backend artifacts and vice versa
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution defines the standard workflow for all feature development in this project. Follow it unless the user explicitly requests a different approach.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0 | **Ratified**: 2026-03-29
