@@ -11,12 +11,19 @@ export default function SubscriptionsPage() {
   const { data: subscriptions, isLoading } = useSubscriptions();
   const [modalOpen, setModalOpen] = useState(false);
   const [editSub, setEditSub] = useState<Subscription | null>(null);
+  const [detectEnabled, setDetectEnabled] = useState(false);
 
   const hasSubscriptions = subscriptions && subscriptions.length > 0;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <button
+          onClick={() => setDetectEnabled(true)}
+          className="rounded-xl bg-surface-container-high px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-on-surface transition-colors hover:bg-surface-container-highest cursor-pointer"
+        >
+          Detect
+        </button>
         <button
           onClick={() => {
             setEditSub(null);
@@ -28,7 +35,7 @@ export default function SubscriptionsPage() {
         </button>
       </div>
 
-      <SuggestionCards />
+      <SuggestionCards enabled={detectEnabled} />
 
       {!isLoading && !hasSubscriptions ? (
         <EmptyState
