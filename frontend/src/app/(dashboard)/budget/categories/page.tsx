@@ -139,9 +139,21 @@ export default function CategoriesPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="font-display text-2xl font-medium text-on-surface">
-        Categories
-      </h1>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => router.push("/budget")}
+          className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface cursor-pointer"
+          title="Back to Budget"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+        </button>
+        <h1 className="font-display text-2xl font-medium text-on-surface">
+          Categories
+        </h1>
+      </div>
 
       {/* CSV Upload — init mode only */}
       {isInitMode && (

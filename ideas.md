@@ -41,13 +41,7 @@
 
 * Track recurring expenses automatically. If the same description appears in consecutive months (e.g. "Netflix", "Spotify"), flag it as recurring and optionally auto-create it for future months.
 
-### ~~Decimal Serialization Fix~~ (DONE - PR #16)
-
-* ~~Pydantic serializes Decimal fields as strings in JSON responses (discovered in PR #12 — sort and progress bars broke). Audit all Pydantic models and add `json_serializers` or `model_config` to serialize Decimals as floats consistently, rather than patching each frontend consumer with `Number()`.~~
-
-### ~~Dark Mode Polish~~ (DONE - PR #15)
-
-* ~~Dark mode toggle exists but hasn't been tested across all new components (Add Spend modal, sort arrows, debug menu model selector). Do a full dark mode audit.~~
+### ~~On Categories page have a Back Arrow button which leads back to Budget Page~~ (DONE - PR #21)
 
 ---
 
