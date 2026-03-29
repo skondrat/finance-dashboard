@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections import Counter
 from collections.abc import Callable
 
 from sqlalchemy.orm import Session
@@ -21,6 +22,44 @@ from app.models.budget_transaction import BudgetTransaction
 from app.models.category import Category
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Built-in rules (hardcoded, always available)
+# ---------------------------------------------------------------------------
+
+_BUILTIN_PREFIX_RULES: list[tuple[str, str]] = [
+    ("atm withdrawal", "ATM Withdrawal"),
+]
+
+
+def _check_builtin_rules(
+    db: Session,
+    user_id: str,
+    description: str,
+    category_by_name: dict[str, "Category"],
+) -> dict | None:
+    """Check built-in prefix rules. Returns categorization result or None."""
+    desc_lower = description.lower().strip()
+    for prefix, cat_name in _BUILTIN_PREFIX_RULES:
+        if desc_lower.startswith(prefix):
+            cat = category_by_name.get(cat_name.lower())
+            if not cat:
+                # Auto-create the built-in category
+                cat = Category(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    name=cat_name,
+                )
+                db.add(cat)
+                db.flush()
+                category_by_name[cat_name.lower()] = cat
+            return {
+                "category_id": cat.id,
+                "category_name": cat.name,
+                "category_source": "rule",
+            }
+    return None
 
 
 def categorize_transaction(
@@ -100,6 +139,12 @@ def categorize_transactions_batch(
             results[idx] = {"category_id": None, "category_name": None, "category_source": "none"}
             continue
 
+        # Step 0: Built-in prefix rules (e.g., ATM Withdrawal)
+        builtin = _check_builtin_rules(db, user_id, description, category_by_name)
+        if builtin:
+            results[idx] = builtin
+            continue
+
         desc_lower = description.lower().strip()
 
         # Step 1: Exact match from mapping file
@@ -156,7 +201,7 @@ def categorize_transactions_batch(
         for idx, _ in ai_needed:
             results[idx] = {"category_id": None, "category_name": None, "category_source": "none"}
 
-    return results
+    return _harmonize_ai_results(results, descriptions)
 
 
 async def categorize_transactions_batch_async(
@@ -201,6 +246,12 @@ async def categorize_transactions_batch_async(
     for idx, description in enumerate(descriptions):
         if not description:
             results[idx] = {"category_id": None, "category_name": None, "category_source": "none"}
+            continue
+
+        # Step 0: Built-in prefix rules (e.g., ATM Withdrawal)
+        builtin = _check_builtin_rules(db, user_id, description, category_by_name)
+        if builtin:
+            results[idx] = builtin
             continue
 
         desc_lower = description.lower().strip()
@@ -274,6 +325,57 @@ async def categorize_transactions_batch_async(
     else:
         for idx, _ in ai_needed:
             results[idx] = {"category_id": None, "category_name": None, "category_source": "none"}
+
+    return _harmonize_ai_results(results, descriptions)
+
+
+def _harmonize_ai_results(
+    results: dict[int, dict],
+    descriptions: list[str],
+) -> dict[int, dict]:
+    """Ensure identical descriptions get the same AI-assigned category.
+
+    Groups by description, finds majority category_id among AI-sourced entries,
+    and applies it to all AI entries in the group. Tie-break: first occurrence (lowest index).
+    """
+    # Group indices by normalized description
+    groups: dict[str, list[int]] = {}
+    for idx, desc in enumerate(descriptions):
+        if idx not in results:
+            continue
+        key = desc.lower().strip()
+        groups.setdefault(key, []).append(idx)
+
+    for indices in groups.values():
+        # Collect AI-sourced entries in this group
+        ai_indices = [i for i in indices if results[i].get("category_source") == "ai"]
+        if len(ai_indices) < 2:
+            continue
+
+        # Count category_id occurrences, preserving first-occurrence order for tie-break
+        cat_counts: Counter[str | None] = Counter()
+        first_occurrence: dict[str | None, int] = {}
+        for i in ai_indices:
+            cat_id = results[i].get("category_id")
+            cat_counts[cat_id] += 1
+            if cat_id not in first_occurrence:
+                first_occurrence[cat_id] = i
+
+        # Find majority: highest count, tie-break by lowest first-occurrence index
+        majority_cat_id = max(
+            cat_counts,
+            key=lambda cid: (cat_counts[cid], -first_occurrence[cid]),
+        )
+
+        # Apply majority to all AI entries in the group
+        majority_result = results[first_occurrence[majority_cat_id]]
+        for i in ai_indices:
+            if results[i].get("category_id") != majority_cat_id:
+                results[i] = {
+                    "category_id": majority_result["category_id"],
+                    "category_name": majority_result["category_name"],
+                    "category_source": "ai",
+                }
 
     return results
 

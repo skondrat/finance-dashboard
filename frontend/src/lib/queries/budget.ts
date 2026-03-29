@@ -73,6 +73,7 @@ export interface ImportResponse {
   row_count: number;
   duplicate_count: number;
   skipped_count: number;
+  excluded_count: number;
   rows: ImportRow[];
 }
 

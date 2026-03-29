@@ -1,6 +1,6 @@
 # finance-dashboard Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-28
+Auto-generated from all feature plans. Last updated: 2026-03-29
 
 ## Active Technologies
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, pdfplumber (PDF table extraction), anthropic (Anthropic Python SDK), Next.js 16, TanStack Query, Zustand, react-dropzone (002-pdf-statement-import)
@@ -11,6 +11,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-28
 - TypeScript 5 (frontend only) + Next.js, TanStack Query (005-fix-import-discard)
 - N/A (backend unchanged) (005-fix-import-discard)
 - TypeScript 5 (frontend only) + Next.js, Reac (006-auto-match-categories)
+- Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, anthropic (backend); Next.js 16, TanStack Query, Zustand (frontend) (007-categorization-quality)
+- SQLite via SQLAlchemy (no schema changes) (007-categorization-quality)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -30,9 +32,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 007-categorization-quality: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, anthropic (backend); Next.js 16, TanStack Query, Zustand (frontend)
 - 006-auto-match-categories: Added TypeScript 5 (frontend only) + Next.js, Reac
 - 005-fix-import-discard: Added TypeScript 5 (frontend only) + Next.js, TanStack Query
-- 004-parallel-categorization-progress: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI (SSE via StreamingResponse), anthropic (async client), Next.js, TanStack Query
 
 
 <!-- MANUAL ADDITIONS START -->
