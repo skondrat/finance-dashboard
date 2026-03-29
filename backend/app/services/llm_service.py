@@ -16,6 +16,18 @@ logger = logging.getLogger(__name__)
 
 _client: anthropic.Anthropic | None = None
 _async_client: anthropic.AsyncAnthropic | None = None
+_model_override: str | None = None
+
+
+def get_model() -> str:
+    """Return the active LLM model (override if set, otherwise config default)."""
+    return _model_override or settings.LLM_MODEL
+
+
+def set_model(model: str) -> None:
+    """Set the LLM model override."""
+    global _model_override
+    _model_override = model
 
 
 def _get_client() -> anthropic.Anthropic:
@@ -74,7 +86,7 @@ def suggest_category(
     try:
         client = _get_client()
         message = client.messages.create(
-            model=settings.LLM_MODEL,
+            model=get_model(),
             max_tokens=100,
             timeout=30.0,
             messages=[{"role": "user", "content": prompt}],
@@ -92,7 +104,7 @@ def suggest_category(
         try:
             client = _get_client()
             message = client.messages.create(
-                model=settings.LLM_MODEL,
+                model=get_model(),
                 max_tokens=100,
                 timeout=30.0,
                 messages=[{"role": "user", "content": prompt}],
@@ -142,7 +154,7 @@ async def suggest_category_async(
     try:
         client = _get_async_client()
         message = await client.messages.create(
-            model=settings.LLM_MODEL,
+            model=get_model(),
             max_tokens=100,
             timeout=30.0,
             messages=[{"role": "user", "content": prompt}],
@@ -159,7 +171,7 @@ async def suggest_category_async(
         try:
             client = _get_async_client()
             message = await client.messages.create(
-                model=settings.LLM_MODEL,
+                model=get_model(),
                 max_tokens=100,
                 timeout=30.0,
                 messages=[{"role": "user", "content": prompt}],
@@ -209,7 +221,7 @@ Column indices are 0-based. For date_format, use Python strftime format (e.g., "
     try:
         client = _get_client()
         message = client.messages.create(
-            model=settings.LLM_MODEL,
+            model=get_model(),
             max_tokens=200,
             timeout=30.0,
             messages=[{"role": "user", "content": prompt}],
@@ -235,7 +247,7 @@ Column indices are 0-based. For date_format, use Python strftime format (e.g., "
         try:
             client = _get_client()
             message = client.messages.create(
-                model=settings.LLM_MODEL,
+                model=get_model(),
                 max_tokens=200,
                 timeout=30.0,
                 messages=[{"role": "user", "content": prompt}],
@@ -313,7 +325,7 @@ def parse_cash_notes(
     def _call_llm() -> list[dict] | None:
         client = _get_client()
         response = client.messages.parse(
-            model=settings.LLM_MODEL,
+            model=get_model(),
             max_tokens=1000,
             timeout=30.0,
             messages=[{"role": "user", "content": prompt}],
@@ -406,7 +418,7 @@ def extract_transactions_from_text(
     def _call_llm() -> list[dict] | None:
         client = _get_client()
         response = client.messages.parse(
-            model=settings.LLM_MODEL,
+            model=get_model(),
             max_tokens=16000,
             timeout=120.0,
             messages=[{"role": "user", "content": prompt}],
