@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { NetworthChart } from "@/components/networth/networth-chart";
 import { SummaryKpi } from "@/components/networth/summary-kpi";
 import { AccountsTable } from "@/components/networth/accounts-table";
 import { AddAccountModal } from "@/components/networth/add-account-modal";
@@ -84,10 +85,7 @@ export default function NetworthPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl font-medium text-on-surface">
-          Net Worth
-        </h1>
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-2">
           <SettingsDropdown
             showDebts={showDebts}
@@ -104,6 +102,8 @@ export default function NetworthPage() {
           </button>
         </div>
       </div>
+
+      <NetworthChart />
 
       <SummaryKpi showDebts={showDebts} />
 
