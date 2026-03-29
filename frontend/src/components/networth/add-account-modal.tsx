@@ -11,6 +11,7 @@ const ACCOUNT_TYPES = [
   { value: "bank", label: "Bank" },
   { value: "crypto", label: "Crypto" },
   { value: "cash", label: "Cash" },
+  { value: "debt", label: "Debt" },
 ] as const;
 
 const CURRENCIES = [

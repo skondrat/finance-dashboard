@@ -90,6 +90,7 @@ function InlineEditCell({ value, accountId }: InlineEditCellProps) {
 }
 
 interface AccountsTableProps {
+  showDebts: boolean;
   onEdit: (acct: {
     id: string;
     name: string;
@@ -99,7 +100,7 @@ interface AccountsTableProps {
   }) => void;
 }
 
-export function AccountsTable({ onEdit }: AccountsTableProps) {
+export function AccountsTable({ showDebts, onEdit }: AccountsTableProps) {
   const { data: summary, isLoading } = useNetworthSummary();
   const currency = useCurrencyStore((s) => s.currency);
   const deleteMutation = useDeleteNetworthAccount();
@@ -112,10 +113,14 @@ export function AccountsTable({ onEdit }: AccountsTableProps) {
     );
   }
 
-  const manualAccounts = summary.accounts.filter(
+  const visibleAccounts = showDebts
+    ? summary.accounts
+    : summary.accounts.filter((a) => a.account_type !== "debt");
+
+  const manualAccounts = visibleAccounts.filter(
     (a) => a.source === "manual"
   );
-  const investmentAccounts = summary.accounts.filter(
+  const investmentAccounts = visibleAccounts.filter(
     (a) => a.source === "investment"
   );
 
@@ -177,7 +182,7 @@ export function AccountsTable({ onEdit }: AccountsTableProps) {
                     account_type: acct.account_type ?? "bank",
                   })
                 }
-                className="font-mono text-xs text-on-surface-variant transition-colors hover:text-on-surface"
+                className="font-mono text-lg text-on-surface-variant transition-colors hover:text-on-surface"
                 title="Edit"
               >
                 ✎
@@ -189,7 +194,7 @@ export function AccountsTable({ onEdit }: AccountsTableProps) {
                   }
                 }}
                 disabled={deleteMutation.isPending}
-                className="font-mono text-xs text-on-surface-variant transition-colors hover:text-on-error-container disabled:opacity-50"
+                className="font-mono text-lg text-on-surface-variant transition-colors hover:text-on-error-container disabled:opacity-50"
                 title="Delete"
               >
                 &times;
@@ -224,7 +229,7 @@ export function AccountsTable({ onEdit }: AccountsTableProps) {
       {manualAccounts.length > 0 && (
         <div className="space-y-2">
           <p className="px-4 font-mono text-[10px] uppercase tracking-[0.15em] text-on-surface-variant/60">
-            Manual Accounts
+            Current Accounts
           </p>
           {manualAccounts.map(renderRow)}
         </div>
