@@ -73,10 +73,10 @@ export function InvestmentRateTrendChart({
               <Line
                 type="monotone"
                 dataKey="rate"
-                stroke="#1a1a1a"
+                stroke="var(--on-surface)"
                 strokeWidth={1.5}
-                dot={{ r: 3, fill: "#1a1a1a", strokeWidth: 0 }}
-                activeDot={{ r: 5, fill: "#1a1a1a", strokeWidth: 0 }}
+                dot={{ r: 3, fill: "var(--on-surface)", strokeWidth: 0 }}
+                activeDot={{ r: 5, fill: "var(--on-surface)", strokeWidth: 0 }}
               />
             </LineChart>
           </ResponsiveContainer>

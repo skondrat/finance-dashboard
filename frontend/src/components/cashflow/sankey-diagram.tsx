@@ -26,10 +26,10 @@ interface LinkDatum {
 type SNode = D3SankeyNode<NodeDatum, LinkDatum>;
 type SLink = D3SankeyLink<NodeDatum, LinkDatum>;
 
-const INCOME_GRAYS = ["#1a1a1a", "#333333", "#4d4d4d", "#666666", "#808080"];
-const EXPENSE_GRAYS = ["#999999", "#808080", "#666666", "#4d4d4d", "#333333", "#b3b3b3", "#a0a0a0", "#707070"];
+const INCOME_GRAYS = ["#6b7280", "#4b5563", "#9ca3af", "#78716c", "#a1a1aa"];
+const EXPENSE_GRAYS = ["#9ca3af", "#78716c", "#6b7280", "#4b5563", "#57534e", "#a8a29e", "#a1a1aa", "#71717a"];
 const SAVINGS_GREEN = "#009668";
-const INVESTMENTS_COLOR = "#4d4d4d";
+const INVESTMENTS_COLOR = "#6b7280";
 
 function getNodeColor(node: NodeDatum, index: number): string {
   switch (node.type) {
@@ -46,7 +46,7 @@ function getNodeColor(node: NodeDatum, index: number): string {
 
 function getLinkColor(targetType: string): string {
   if (targetType === "savings") return "rgba(0, 150, 104, 0.15)";
-  return "rgba(0, 0, 0, 0.08)";
+  return "rgba(128, 128, 128, 0.12)";
 }
 
 interface TooltipData {

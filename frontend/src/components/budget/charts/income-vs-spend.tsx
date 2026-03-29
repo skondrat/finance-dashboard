@@ -81,7 +81,7 @@ export function IncomeVsSpendChart({ months = 12 }: IncomeVsSpendChartProps) {
               />
               <Tooltip
                 content={<ChartTooltip currency={currency} />}
-                cursor={{ fill: "rgba(0,0,0,0.04)" }}
+                cursor={{ fill: "var(--on-surface)", opacity: 0.04 }}
               />
               <Legend
                 wrapperStyle={{
@@ -97,7 +97,7 @@ export function IncomeVsSpendChart({ months = 12 }: IncomeVsSpendChartProps) {
               />
               <Bar
                 dataKey="spend"
-                fill="#1a1a1a"
+                fill="var(--on-surface)"
                 radius={[4, 4, 0, 0]}
                 maxBarSize={32}
               />
