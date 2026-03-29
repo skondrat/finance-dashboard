@@ -6,6 +6,7 @@ import { BudgetKpiStrip } from "@/components/budget/kpi-strip";
 import { TimeAggregation, type Period } from "@/components/budget/time-aggregation";
 import { CategoryTable } from "@/components/budget/category-table";
 import { ImportModal } from "@/components/budget/import-modal";
+import { AddSpendModal } from "@/components/budget/add-spend-modal";
 import { IncomeManager } from "@/components/budget/income-manager";
 import { DebugMenu } from "@/components/budget/debug-menu";
 import { SettingsMenu } from "@/components/budget/settings-menu";
@@ -92,6 +93,7 @@ export default function BudgetPage() {
         <div className="col-span-12 space-y-6 lg:col-span-4">
           <div className="flex items-center gap-2">
             <ImportModal />
+            <AddSpendModal />
             <SettingsMenu />
           </div>
           <IncomeManager year={summaryYear} month={summaryMonth} />
