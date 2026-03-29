@@ -1,11 +1,36 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import {
   useSpendByCategory,
   type SpendByCategoryItem,
 } from "@/lib/queries/budget";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { cn, formatCurrency, formatPercent } from "@/lib/utils";
+
+type SortColumn = "name" | "budget" | "spent" | "remaining" | "pct_of_total";
+type SortDirection = "asc" | "desc";
+
+function SortArrow({ direction, active }: { direction: SortDirection; active: boolean }) {
+  return (
+    <svg
+      width="10"
+      height="10"
+      viewBox="0 0 10 10"
+      fill="none"
+      className={cn(
+        "ml-1 inline-block transition-opacity",
+        active ? "opacity-100" : "opacity-0"
+      )}
+    >
+      {direction === "desc" ? (
+        <path d="M5 7L1 3h8L5 7z" fill="currentColor" />
+      ) : (
+        <path d="M5 3L1 7h8L5 3z" fill="currentColor" />
+      )}
+    </svg>
+  );
+}
 
 function CategorySkeleton() {
   return (
@@ -27,14 +52,16 @@ function ProgressBar({
   spent: number;
   budget: number | null;
 }) {
-  if (budget === null || budget === 0) {
+  const numBudget = budget != null ? Number(budget) : null;
+  if (numBudget === null || numBudget === 0) {
     return (
-      <div className="h-1.5 w-full rounded-full bg-on-surface-variant/20" />
+      <div className="h-1.5 w-full rounded-full bg-on-surface-variant/10" />
     );
   }
 
-  const pct = Math.min((spent / budget) * 100, 100);
-  const overBudget = spent > budget;
+  const numSpent = Number(spent);
+  const pct = Math.min((numSpent / numBudget) * 100, 100);
+  const overBudget = numSpent > numBudget;
 
   return (
     <div className="h-1.5 w-full rounded-full bg-on-surface-variant/10">
@@ -102,10 +129,53 @@ function CategoryRow({ item, currency }: CategoryRowProps) {
       </div>
 
       <div className="mt-2">
-        <ProgressBar spent={item.spent} budget={item.budget} />
+        <ProgressBar spent={Number(item.spent)} budget={item.budget != null ? Number(item.budget) : null} />
       </div>
     </div>
   );
+}
+
+function getValue(item: SpendByCategoryItem, col: SortColumn): string | number | null {
+  switch (col) {
+    case "name": return item.category.name;
+    case "budget": return item.budget != null ? Number(item.budget) : null;
+    case "spent": return Number(item.spent);
+    case "remaining": return item.remaining != null ? Number(item.remaining) : null;
+    case "pct_of_total": return Number(item.pct_of_total);
+  }
+}
+
+const SORT_TO_END_COLUMNS: SortColumn[] = ["budget", "remaining"];
+
+function sortData(
+  data: SpendByCategoryItem[],
+  column: SortColumn | null,
+  direction: SortDirection
+): SpendByCategoryItem[] {
+  if (!column) return data;
+
+  const sortNullishToEnd = SORT_TO_END_COLUMNS.includes(column);
+
+  return [...data].sort((a, b) => {
+    const aVal = getValue(a, column);
+    const bVal = getValue(b, column);
+
+    // Nulls and zeros (for budget/remaining) sort to the end
+    const aEmpty = aVal === null || (sortNullishToEnd && aVal === 0);
+    const bEmpty = bVal === null || (sortNullishToEnd && bVal === 0);
+    if (aEmpty && bEmpty) return 0;
+    if (aEmpty) return 1;
+    if (bEmpty) return -1;
+
+    let cmp: number;
+    if (typeof aVal === "string" && typeof bVal === "string") {
+      cmp = aVal.localeCompare(bVal);
+    } else {
+      cmp = (aVal as number) - (bVal as number);
+    }
+
+    return direction === "asc" ? cmp : -cmp;
+  });
 }
 
 interface CategoryTableProps {
@@ -116,9 +186,33 @@ interface CategoryTableProps {
   toDate?: string;
 }
 
+const COLUMNS: { key: SortColumn; label: string; align: string }[] = [
+  { key: "name", label: "Category", align: "text-left" },
+  { key: "budget", label: "Budget", align: "text-right" },
+  { key: "spent", label: "Spent", align: "text-right" },
+  { key: "remaining", label: "Remaining", align: "text-right" },
+  { key: "pct_of_total", label: "% Total", align: "text-right" },
+];
+
 export function CategoryTable({ period, month, year, fromDate, toDate }: CategoryTableProps) {
   const { data, isLoading } = useSpendByCategory(period, month, year, fromDate, toDate);
   const currency = useCurrencyStore((s) => s.currency);
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const sortedData = useMemo(() => {
+    if (!data) return [];
+    return sortData(data, sortColumn, sortDirection);
+  }, [data, sortColumn, sortDirection]);
+
+  function handleSort(col: SortColumn) {
+    if (sortColumn === col) {
+      setSortDirection((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortColumn(col);
+      setSortDirection("desc");
+    }
+  }
 
   return (
     <div className="rounded-2xl bg-surface-container-low p-6">
@@ -128,21 +222,23 @@ export function CategoryTable({ period, month, year, fromDate, toDate }: Categor
 
       {/* Header */}
       <div className="grid grid-cols-[2fr_1fr_1fr_1fr_0.5fr] gap-4 px-4 pb-2">
-        <span className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
-          Category
-        </span>
-        <span className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant text-right">
-          Budget
-        </span>
-        <span className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant text-right">
-          Spent
-        </span>
-        <span className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant text-right">
-          Remaining
-        </span>
-        <span className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant text-right">
-          % Total
-        </span>
+        {COLUMNS.map((col) => (
+          <button
+            key={col.key}
+            onClick={() => handleSort(col.key)}
+            className={cn(
+              "font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer select-none inline-flex items-center",
+              col.align,
+              col.align === "text-right" && "justify-end"
+            )}
+          >
+            {col.label}
+            <SortArrow
+              direction={sortColumn === col.key ? sortDirection : "desc"}
+              active={sortColumn === col.key}
+            />
+          </button>
+        ))}
       </div>
 
       {/* Rows */}
@@ -150,7 +246,7 @@ export function CategoryTable({ period, month, year, fromDate, toDate }: Categor
         <CategorySkeleton />
       ) : (
         <div className="space-y-2">
-          {data.map((item) => (
+          {sortedData.map((item) => (
             <CategoryRow key={item.category.id} item={item} currency={currency} />
           ))}
         </div>
