@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
     accounts, transactions, portfolio, categories, import_, budget, income,
-    exchange_rates, cashflow, budget_charts, users, auth,
+    exchange_rates, cashflow, budget_charts, users, auth, networth,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ app.include_router(income.router)
 app.include_router(exchange_rates.router)
 app.include_router(cashflow.router)
 app.include_router(budget_charts.router)
+app.include_router(networth.router)
 app.include_router(users.router)
 
 
