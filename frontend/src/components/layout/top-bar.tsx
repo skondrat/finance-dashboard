@@ -11,6 +11,7 @@ const tabs = [
   { label: "PORTFOLIO", href: "/portfolio" },
   { label: "BUDGET", href: "/budget" },
   { label: "CASHFLOW", href: "/cashflow" },
+  { label: "SUBSCRIPTIONS", href: "/subscriptions" },
   { label: "NETWORTH", href: "/networth" },
 ];
 

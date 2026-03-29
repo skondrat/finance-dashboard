@@ -22,3 +22,5 @@ class User(Base):
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
     networth_accounts = relationship("NetworthAccount", back_populates="user", cascade="all, delete-orphan")
     networth_snapshots = relationship("NetworthSnapshot", back_populates="user", cascade="all, delete-orphan")
+    subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
+    dismissed_suggestions = relationship("DismissedSuggestion", back_populates="user", cascade="all, delete-orphan")
