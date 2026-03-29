@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { CurrencyToggle } from "./currency-toggle";
 import { ThemeToggle } from "./theme-toggle";
+import { UserMenu } from "./user-menu";
 
 const tabs = [
   { label: "PORTFOLIO", href: "/portfolio" },
@@ -46,9 +47,7 @@ export function TopBar() {
         <div className="flex items-center gap-4">
           <CurrencyToggle />
           <ThemeToggle />
-          <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-xs font-mono text-on-surface-variant">
-            U
-          </div>
+          <UserMenu />
         </div>
       </div>
     </header>
