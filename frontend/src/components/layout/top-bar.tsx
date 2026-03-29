@@ -10,6 +10,7 @@ const tabs = [
   { label: "PORTFOLIO", href: "/portfolio" },
   { label: "BUDGET", href: "/budget" },
   { label: "CASHFLOW", href: "/cashflow" },
+  { label: "NETWORTH", href: "/networth" },
 ];
 
 export function TopBar() {

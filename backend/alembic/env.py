@@ -7,7 +7,7 @@ from app.database import Base
 from app.models import (  # noqa: F401 — register models
     user, account, asset, investment_transaction, asset_price,
     category, auto_cat_rule, budget_transaction, bank_profile, statement_import, income_source,
-    exchange_rate,
+    exchange_rate, networth_account,
 )
 
 config = context.config

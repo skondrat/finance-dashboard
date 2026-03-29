@@ -20,3 +20,4 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
+    networth_accounts = relationship("NetworthAccount", back_populates="user", cascade="all, delete-orphan")
