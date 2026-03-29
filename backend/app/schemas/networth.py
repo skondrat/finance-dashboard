@@ -50,3 +50,17 @@ class NetworthSummaryResponse(BaseModel):
     investment_total: FloatDecimal
     currency: str
     accounts: list[NetworthSummaryAccount]
+
+
+class NetworthSnapshotResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    snapshot_month: str
+    total_networth: FloatDecimal
+    currency: str
+    breakdown: Optional[list] = None
+    updated_at: datetime
+
+
+class NetworthHistoryResponse(BaseModel):
+    snapshots: list[NetworthSnapshotResponse]

@@ -46,6 +46,33 @@ export interface UpdateNetworthAccountPayload {
   account_type?: string;
 }
 
+export interface NetworthSnapshot {
+  snapshot_month: string;
+  total_networth: number;
+  currency: string;
+  breakdown: Array<{
+    name: string;
+    balance: number;
+    source: string;
+    account_type: string | null;
+  }> | null;
+  updated_at: string;
+}
+
+export interface NetworthHistory {
+  snapshots: NetworthSnapshot[];
+}
+
+export function useNetworthHistory() {
+  const currency = useCurrencyStore((s) => s.currency);
+
+  return useQuery<NetworthHistory>({
+    queryKey: ["networth", "history", currency],
+    queryFn: () =>
+      apiFetch<NetworthHistory>(`/networth/history?currency=${currency}`),
+  });
+}
+
 export function useNetworthAccounts() {
   return useQuery<NetworthAccount[]>({
     queryKey: ["networth", "accounts"],

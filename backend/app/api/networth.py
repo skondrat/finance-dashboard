@@ -11,14 +11,17 @@ from app.api.deps import get_current_user_id
 from app.database import get_db
 from app.models.account import Account
 from app.models.networth_account import NetworthAccount
+from app.models.networth_snapshot import NetworthSnapshot
 from app.schemas.networth import (
     NetworthAccountCreate,
     NetworthAccountResponse,
     NetworthAccountUpdate,
+    NetworthHistoryResponse,
+    NetworthSnapshotResponse,
     NetworthSummaryAccount,
     NetworthSummaryResponse,
 )
-from app.services import fx_service, portfolio_service
+from app.services import fx_service, networth_service, portfolio_service
 
 router = APIRouter(prefix="/api/v1/networth", tags=["networth"])
 
@@ -70,6 +73,7 @@ def create_networth_account(
     db.add(account)
     db.commit()
     db.refresh(account)
+    networth_service.capture_snapshot(db, user_id)
     return account
 
 
@@ -99,6 +103,7 @@ def update_networth_account(
 
     db.commit()
     db.refresh(account)
+    networth_service.capture_snapshot(db, user_id)
     return account
 
 
@@ -123,6 +128,7 @@ def delete_networth_account(
 
     db.delete(account)
     db.commit()
+    networth_service.capture_snapshot(db, user_id)
 
 
 # ---------------------------------------------------------------------------
@@ -231,3 +237,26 @@ def get_networth_summary(
         currency=currency,
         accounts=summary_accounts,
     )
+
+
+# ---------------------------------------------------------------------------
+# History
+# ---------------------------------------------------------------------------
+
+
+@router.get("/history", response_model=NetworthHistoryResponse)
+def get_networth_history(
+    currency: str = "EUR",
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    snapshots = (
+        db.query(NetworthSnapshot)
+        .filter(
+            NetworthSnapshot.user_id == user_id,
+            NetworthSnapshot.currency == currency,
+        )
+        .order_by(NetworthSnapshot.snapshot_month.asc())
+        .all()
+    )
+    return NetworthHistoryResponse(snapshots=snapshots)

@@ -29,6 +29,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-29
 - N/A (backend unchanged — delete endpoint already exists) (020-portfolio-account-list)
 - TypeScript 5 (frontend only) + Next.js 16, React 19, Zustand (auth store), Tailwind CSS v4 (021-user-menu)
 - N/A (reads from existing auth store) (021-user-menu)
+- Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, React 19, Recharts 3, TanStack Query, Zustand (frontend) (022-networth-history)
+- SQLite via SQLAlchemy (new `networth_snapshots` table + Alembic migration) (022-networth-history)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -48,9 +50,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 022-networth-history: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, React 19, Recharts 3, TanStack Query, Zustand (frontend)
 - 021-user-menu: Added TypeScript 5 (frontend only) + Next.js 16, React 19, Zustand (auth store), Tailwind CSS v4
 - 020-portfolio-account-list: Added TypeScript 5 (frontend only) + Next.js 16, TanStack Query v5, Tailwind CSS v4
-- 019-portfolio-layout-fullwidth: Added TypeScript 5 (frontend only) + Next.js 16, Tailwind CSS v4
 
 
 <!-- MANUAL ADDITIONS START -->
