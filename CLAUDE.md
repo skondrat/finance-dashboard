@@ -25,6 +25,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-29
 - SQLite via SQLAlchemy (Alembic migrations) (018-networth-tab)
 - TypeScript 5 (frontend only) + Next.js 16, Tailwind CSS v4 (019-portfolio-layout-fullwidth)
 - N/A (no data changes) (019-portfolio-layout-fullwidth)
+- TypeScript 5 (frontend only) + Next.js 16, TanStack Query v5, Tailwind CSS v4 (020-portfolio-account-list)
+- N/A (backend unchanged — delete endpoint already exists) (020-portfolio-account-list)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -44,9 +46,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 020-portfolio-account-list: Added TypeScript 5 (frontend only) + Next.js 16, TanStack Query v5, Tailwind CSS v4
 - 019-portfolio-layout-fullwidth: Added TypeScript 5 (frontend only) + Next.js 16, Tailwind CSS v4
 - 018-networth-tab: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query v5, Zustand v5, Tailwind CSS v4 (frontend)
-- 015-auto-income-from-statement: Added Python 3.11 (backend only) + FastAPI, SQLAlchemy 2.0
 
 
 <!-- MANUAL ADDITIONS START -->
