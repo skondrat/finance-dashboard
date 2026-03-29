@@ -12,6 +12,7 @@ import io
 import uuid
 from decimal import Decimal, InvalidOperation
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.category import Category
@@ -108,6 +109,30 @@ def load_seed_categories(
     # Save example mappings to the MD file
     if all_mappings:
         save_bulk_mappings(all_mappings)
+
+    # Ensure Debt and Investments categories exist
+    _ENSURE_CATEGORIES = [
+        {"name": "Debt", "color": "#DC2626"},
+        {"name": "Investments", "color": "#10B981"},
+    ]
+    for cat_def in _ENSURE_CATEGORIES:
+        exists = (
+            db.query(Category)
+            .filter(
+                Category.user_id == user_id,
+                func.lower(Category.name) == cat_def["name"].lower(),
+            )
+            .first()
+        )
+        if not exists:
+            db.add(Category(
+                id=str(uuid.uuid4()),
+                user_id=user_id,
+                name=cat_def["name"],
+                color=cat_def["color"],
+            ))
+            categories_loaded += 1
+    db.commit()
 
     return {
         "categories_loaded": categories_loaded,

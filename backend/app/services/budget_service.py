@@ -175,6 +175,30 @@ def _investment_spend_for_period(
 # ---------------------------------------------------------------------------
 
 
+def create_transaction(db: Session, user_id: str, data) -> BudgetTransaction:
+    """Create a manual budget transaction."""
+    import hashlib
+
+    dedup_input = f"{user_id}:{data.date}:{data.description}:{data.amount}:{data.currency}:{uuid.uuid4()}"
+    dedup_hash = hashlib.sha256(dedup_input.encode()).hexdigest()
+
+    tx = BudgetTransaction(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        date=data.date,
+        description=data.description,
+        amount=data.amount,
+        currency=data.currency,
+        category_id=data.category_id,
+        is_investment=data.is_investment,
+        dedup_hash=dedup_hash,
+    )
+    db.add(tx)
+    db.commit()
+    db.refresh(tx)
+    return tx
+
+
 def seed_default_categories(db: Session, user_id: str) -> list[Category]:
     """Create the 12 default budget categories for a user.
 
