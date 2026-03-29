@@ -102,6 +102,17 @@ async def create_import(
     else:
         parsed_rows = parser.parse(file_content, bank_profile=bank_profile)
 
+    # Exclude internal transfers (e.g., "Transfer between balances")
+    excluded_count = 0
+    filtered_rows = []
+    for row in parsed_rows:
+        desc = row.get("description", "").lower().strip()
+        if desc.startswith("transfer between balances"):
+            excluded_count += 1
+        else:
+            filtered_rows.append(row)
+    parsed_rows = filtered_rows
+
     # For PDF imports, run enhanced categorization
     is_pdf = statement_format == StatementFormat.PDF
     category_results: dict[int, dict] = {}
@@ -211,6 +222,7 @@ async def create_import(
         "row_count": len(created_transactions),
         "duplicate_count": duplicate_count,
         "skipped_count": skipped_count,
+        "excluded_count": excluded_count,
         "rows": response_rows,
     }
 

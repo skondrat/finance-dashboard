@@ -116,6 +116,7 @@ class ImportUploadResponse(BaseModel):
     row_count: int
     duplicate_count: int
     skipped_count: int = 0
+    excluded_count: int = 0
     rows: list[ImportRowResponse]
 
 

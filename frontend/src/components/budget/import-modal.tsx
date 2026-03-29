@@ -129,11 +129,15 @@ function PreviewTable({
                 ? categories.find((c) => c.id === overriddenCatId)?.name ??
                   null
                 : row.category_name;
+            const isOther = currentCatName === "Other";
 
             return (
               <tr
                 key={idx}
-                className="border-b border-on-surface-variant/5 last:border-0"
+                className={cn(
+                  "border-b border-on-surface-variant/5 last:border-0",
+                  isOther && "bg-on-error-container/5"
+                )}
               >
                 <td className="py-2 font-mono text-xs text-on-surface">
                   {row.date}
@@ -585,6 +589,12 @@ export function ImportModal() {
                       <span>
                         {" "}
                         ({preview.skipped_count} rows skipped)
+                      </span>
+                    )}
+                    {preview.excluded_count > 0 && (
+                      <span>
+                        {" "}
+                        ({preview.excluded_count} internal transfers excluded)
                       </span>
                     )}
                   </p>
