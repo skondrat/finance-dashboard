@@ -76,6 +76,19 @@ export function useCreateAccount() {
   });
 }
 
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: (id) =>
+      apiFetch<void>(`/accounts/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio-summary"] });
+    },
+  });
+}
+
 export function useCreateTransaction(accountId: string) {
   const queryClient = useQueryClient();
 
