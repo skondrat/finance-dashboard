@@ -4,6 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.common import FloatDecimal
 from app.schemas.portfolio import AssetResponse
 
 
@@ -31,10 +32,10 @@ class AccountResponse(BaseModel):
 class TransactionCreate(BaseModel):
     asset_ticker: str
     type: str
-    quantity: Decimal
-    price_per_unit: Decimal
+    quantity: FloatDecimal
+    price_per_unit: FloatDecimal
     currency: str
-    fees: Decimal = Decimal("0")
+    fees: FloatDecimal = Decimal("0")
     date: date_type
 
 
@@ -54,8 +55,8 @@ class TransactionResponse(BaseModel):
     id: str
     asset: AssetResponse
     type: str
-    quantity: Decimal
-    price_per_unit: Decimal
+    quantity: FloatDecimal
+    price_per_unit: FloatDecimal
     currency: str
-    fees: Decimal
+    fees: FloatDecimal
     date: date_type

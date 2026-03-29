@@ -52,16 +52,14 @@ function ProgressBar({
   spent: number;
   budget: number | null;
 }) {
-  const numBudget = budget != null ? Number(budget) : null;
-  if (numBudget === null || numBudget === 0) {
+  if (budget === null || budget === 0) {
     return (
       <div className="h-1.5 w-full rounded-full bg-on-surface-variant/10" />
     );
   }
 
-  const numSpent = Number(spent);
-  const pct = Math.min((numSpent / numBudget) * 100, 100);
-  const overBudget = numSpent > numBudget;
+  const pct = Math.min((spent / budget) * 100, 100);
+  const overBudget = spent > budget;
 
   return (
     <div className="h-1.5 w-full rounded-full bg-on-surface-variant/10">
@@ -129,7 +127,7 @@ function CategoryRow({ item, currency }: CategoryRowProps) {
       </div>
 
       <div className="mt-2">
-        <ProgressBar spent={Number(item.spent)} budget={item.budget != null ? Number(item.budget) : null} />
+        <ProgressBar spent={item.spent} budget={item.budget} />
       </div>
     </div>
   );
@@ -138,10 +136,10 @@ function CategoryRow({ item, currency }: CategoryRowProps) {
 function getValue(item: SpendByCategoryItem, col: SortColumn): string | number | null {
   switch (col) {
     case "name": return item.category.name;
-    case "budget": return item.budget != null ? Number(item.budget) : null;
-    case "spent": return Number(item.spent);
-    case "remaining": return item.remaining != null ? Number(item.remaining) : null;
-    case "pct_of_total": return Number(item.pct_of_total);
+    case "budget": return item.budget;
+    case "spent": return item.spent;
+    case "remaining": return item.remaining;
+    case "pct_of_total": return item.pct_of_total;
   }
 }
 

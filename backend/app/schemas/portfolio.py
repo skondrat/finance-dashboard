@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.common import FloatDecimal
+
 
 class AssetResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -17,26 +19,26 @@ class PositionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     asset: AssetResponse
-    quantity: Decimal
-    avg_cost_basis: Decimal
-    total_cost: Decimal
-    current_price: Decimal
-    current_value: Decimal
-    pnl_absolute: Decimal
-    pnl_percent: Decimal
-    weight: Decimal
+    quantity: FloatDecimal
+    avg_cost_basis: FloatDecimal
+    total_cost: FloatDecimal
+    current_price: FloatDecimal
+    current_value: FloatDecimal
+    pnl_absolute: FloatDecimal
+    pnl_percent: FloatDecimal
+    weight: FloatDecimal
     currency: str
 
 
 class PortfolioSummaryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    net_worth: Decimal
-    total_return: Decimal
-    return_pct: Decimal
-    saving_rate: Decimal
-    investment_rate: Decimal
-    invested_capital: Decimal
+    net_worth: FloatDecimal
+    total_return: FloatDecimal
+    return_pct: FloatDecimal
+    saving_rate: FloatDecimal
+    investment_rate: FloatDecimal
+    invested_capital: FloatDecimal
     currency: str
 
 
@@ -44,7 +46,7 @@ class PerformanceDataPoint(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     date: date
-    value: Decimal
+    value: FloatDecimal
 
 
 class PerformanceResponse(BaseModel):
@@ -63,15 +65,15 @@ class AllocationSegment(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     label: str
-    value: Decimal
-    percentage: Decimal
+    value: FloatDecimal
+    percentage: FloatDecimal
 
 
 class AllocationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     group_by: str
-    total: Decimal
+    total: FloatDecimal
     segments: list[AllocationSegment]
 
 
@@ -83,16 +85,16 @@ class AllocationResponse(BaseModel):
 class PerformanceBreakdownResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    capital: Decimal
-    price_gain: Decimal
-    price_gain_pct: Decimal
-    dividends: Decimal
-    dividends_pct: Decimal
-    realized_losses: Decimal
-    realized_losses_pct: Decimal
-    transaction_costs: Decimal
-    total_return: Decimal
-    total_return_pct: Decimal
-    irr: Decimal
-    twr: Decimal
+    capital: FloatDecimal
+    price_gain: FloatDecimal
+    price_gain_pct: FloatDecimal
+    dividends: FloatDecimal
+    dividends_pct: FloatDecimal
+    realized_losses: FloatDecimal
+    realized_losses_pct: FloatDecimal
+    transaction_costs: FloatDecimal
+    total_return: FloatDecimal
+    total_return_pct: FloatDecimal
+    irr: FloatDecimal
+    twr: FloatDecimal
     currency: str
