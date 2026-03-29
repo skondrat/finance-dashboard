@@ -7,12 +7,14 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
+from app.schemas.common import FloatDecimal
+
 
 class ExchangeRateResponse(BaseModel):
     id: str
     base_currency: str
     target_currency: str
-    rate: Decimal
+    rate: FloatDecimal
     date: date
     fetched_at: datetime
 
@@ -22,13 +24,13 @@ class ExchangeRateResponse(BaseModel):
 class LatestRateResponse(BaseModel):
     base_currency: str
     target_currency: str
-    rate: Decimal
+    rate: FloatDecimal
     date: date
 
 
 class HistoricalRateEntry(BaseModel):
     date: date
-    rate: Decimal
+    rate: FloatDecimal
 
 
 class HistoricalRatesResponse(BaseModel):

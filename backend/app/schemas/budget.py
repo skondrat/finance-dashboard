@@ -8,6 +8,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.common import FloatDecimal
+
 
 # ---------------------------------------------------------------------------
 # Category
@@ -17,13 +19,13 @@ from pydantic import BaseModel, ConfigDict
 class CategoryCreate(BaseModel):
     name: str
     color: str = "#4c4546"
-    monthly_budget: Optional[Decimal] = None
+    monthly_budget: Optional[FloatDecimal] = None
 
 
 class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     color: Optional[str] = None
-    monthly_budget: Optional[Decimal] = None
+    monthly_budget: Optional[FloatDecimal] = None
     is_archived: Optional[bool] = None
 
 
@@ -33,7 +35,7 @@ class CategoryResponse(BaseModel):
     id: str
     name: str
     color: str
-    monthly_budget: Optional[Decimal] = None
+    monthly_budget: Optional[FloatDecimal] = None
     is_archived: bool
     is_default: bool
 
@@ -67,7 +69,7 @@ class AutoCatRuleResponse(BaseModel):
 class BudgetTransactionCreate(BaseModel):
     date: date_type
     description: str
-    amount: Decimal
+    amount: FloatDecimal
     currency: str
     category_id: Optional[str] = None
     is_investment: bool = False
@@ -85,7 +87,7 @@ class BudgetTransactionResponse(BaseModel):
     id: str
     date: date_type
     description: str
-    amount: Decimal
+    amount: FloatDecimal
     currency: str
     category_id: Optional[str] = None
     is_investment: bool
@@ -100,7 +102,7 @@ class BudgetTransactionResponse(BaseModel):
 class ImportRowResponse(BaseModel):
     date: str
     description: str
-    amount: Decimal
+    amount: FloatDecimal
     currency: str
     type: str = "debit"
     category_id: Optional[str] = None
@@ -141,19 +143,19 @@ class SplitAtmRequest(BaseModel):
 
 class CashSplitItem(BaseModel):
     description: str
-    amount: Decimal
+    amount: FloatDecimal
     category_id: Optional[str] = None
     category_name: Optional[str] = None
 
 
 class SplitAtmResponse(BaseModel):
     items: list[CashSplitItem]
-    remainder: Decimal
+    remainder: FloatDecimal
 
 
 class SplitConfirmItem(BaseModel):
     description: str
-    amount: Decimal
+    amount: FloatDecimal
     category_id: Optional[str] = None
 
 
@@ -171,7 +173,7 @@ class ImportCategoryResponse(BaseModel):
     id: str
     name: str
     color: str
-    monthly_budget: Optional[Decimal] = None
+    monthly_budget: Optional[FloatDecimal] = None
 
 
 class SeedCategoriesResponse(BaseModel):
@@ -223,7 +225,7 @@ class BankProfileResponse(BaseModel):
 
 class IncomeSourceCreate(BaseModel):
     label: str
-    amount: Decimal
+    amount: FloatDecimal
     currency: str
     month: int
     year: int
@@ -234,7 +236,7 @@ class IncomeSourceResponse(BaseModel):
 
     id: str
     label: str
-    amount: Decimal
+    amount: FloatDecimal
     currency: str
     month: int
     year: int
@@ -246,19 +248,19 @@ class IncomeSourceResponse(BaseModel):
 
 
 class BudgetSummaryResponse(BaseModel):
-    income: Decimal
-    spend: Decimal
-    savings: Decimal
-    saving_rate: Decimal
-    investment_rate: Decimal
-    budget_remaining: Decimal
+    income: FloatDecimal
+    spend: FloatDecimal
+    savings: FloatDecimal
+    saving_rate: FloatDecimal
+    investment_rate: FloatDecimal
+    budget_remaining: FloatDecimal
     currency: str
 
 
 class SpendByCategoryItem(BaseModel):
     category: CategoryResponse
-    budget: Optional[Decimal] = None
-    spent: Decimal
-    remaining: Optional[Decimal] = None
-    pct_of_total: Decimal
+    budget: Optional[FloatDecimal] = None
+    spent: FloatDecimal
+    remaining: Optional[FloatDecimal] = None
+    pct_of_total: FloatDecimal
     sparkline: Optional[list[float]] = None

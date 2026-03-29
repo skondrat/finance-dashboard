@@ -1,4 +1,11 @@
+from decimal import Decimal
+from typing import Annotated
+
 from pydantic import BaseModel
+from pydantic.functional_serializers import PlainSerializer
+
+# Decimal type that serializes as float in JSON responses (not string).
+FloatDecimal = Annotated[Decimal, PlainSerializer(float, return_type=float)]
 
 
 class PaginatedResponse(BaseModel):
