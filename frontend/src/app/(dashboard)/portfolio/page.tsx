@@ -16,9 +16,13 @@ export default function PortfolioPage() {
 
   return (
     <div className="grid grid-cols-12 gap-6">
+      {/* KPI strip — full width */}
+      <div className="col-span-12">
+        <KpiStrip />
+      </div>
+
       {/* Main content — 8 columns */}
       <div className="col-span-12 space-y-6 lg:col-span-8">
-        <KpiStrip />
         <PerformanceChart />
         <PositionsList onAccountChange={setSelectedAccountId} />
         {selectedAccountId && (
