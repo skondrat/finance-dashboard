@@ -43,10 +43,12 @@ interface BudgetKpiStripProps {
   period: string;
   month?: number;
   year?: number;
+  fromDate?: string;
+  toDate?: string;
 }
 
-export function BudgetKpiStrip({ period, month, year }: BudgetKpiStripProps) {
-  const { data, isLoading } = useBudgetSummary(period, month, year);
+export function BudgetKpiStrip({ period, month, year, fromDate, toDate }: BudgetKpiStripProps) {
+  const { data, isLoading } = useBudgetSummary(period, month, year, fromDate, toDate);
   const currency = useCurrencyStore((s) => s.currency);
 
   if (isLoading || !data) {

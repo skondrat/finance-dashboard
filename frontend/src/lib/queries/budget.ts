@@ -126,42 +126,52 @@ export interface UploadParams {
 export function useBudgetSummary(
   period: string,
   month?: number,
-  year?: number
+  year?: number,
+  fromDate?: string,
+  toDate?: string
 ) {
   const currency = useCurrencyStore((s) => s.currency);
 
   return useQuery<BudgetSummary>({
-    queryKey: ["budget", "summary", period, month, year, currency],
+    queryKey: ["budget", "summary", period, month, year, fromDate, toDate, currency],
     queryFn: () => {
       const params = new URLSearchParams({ period });
       if (month !== undefined) params.set("month", String(month));
       if (year !== undefined) params.set("year", String(year));
+      if (fromDate) params.set("from", fromDate);
+      if (toDate) params.set("to", toDate);
       if (currency) params.set("currency", currency);
       return apiFetch<BudgetSummary>(
         `/budget/summary?${params.toString()}`
       );
     },
+    enabled: period !== "custom" || (!!fromDate && !!toDate),
   });
 }
 
 export function useSpendByCategory(
   period: string,
   month?: number,
-  year?: number
+  year?: number,
+  fromDate?: string,
+  toDate?: string
 ) {
   const currency = useCurrencyStore((s) => s.currency);
 
   return useQuery<SpendByCategoryItem[]>({
-    queryKey: ["budget", "spend-by-category", period, month, year, currency],
+    queryKey: ["budget", "spend-by-category", period, month, year, fromDate, toDate, currency],
     queryFn: () => {
       const params = new URLSearchParams({ period });
       if (month !== undefined) params.set("month", String(month));
       if (year !== undefined) params.set("year", String(year));
+      if (fromDate) params.set("from", fromDate);
+      if (toDate) params.set("to", toDate);
       if (currency) params.set("currency", currency);
       return apiFetch<SpendByCategoryItem[]>(
         `/budget/spend-by-category?${params.toString()}`
       );
     },
+    enabled: period !== "custom" || (!!fromDate && !!toDate),
   });
 }
 
@@ -503,6 +513,20 @@ export function useDeleteCategory() {
     mutationFn: (id) =>
       apiFetch(`/budget/categories/${id}`, {
         method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
+    },
+  });
+}
+
+export function useEnsureRequiredCategories() {
+  const queryClient = useQueryClient();
+
+  return useMutation<{ created: string[] }, Error, void>({
+    mutationFn: () =>
+      apiFetch("/budget/categories/ensure-required", {
+        method: "POST",
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budget"] });

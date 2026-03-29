@@ -180,6 +180,10 @@ class SeedCategoriesResponse(BaseModel):
     budgets_loaded: int = 0
 
 
+class EnsureRequiredResponse(BaseModel):
+    created: list[str]
+
+
 # ---------------------------------------------------------------------------
 # Bank profiles
 # ---------------------------------------------------------------------------

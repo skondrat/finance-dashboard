@@ -16,6 +16,7 @@ from app.schemas.budget import (
     CategoryCreate,
     CategoryResponse,
     CategoryUpdate,
+    EnsureRequiredResponse,
     MergeCategoryRequest,
 )
 from app.services import categorization_service
@@ -136,6 +137,46 @@ def delete_category(
 
     db.delete(category)
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Ensure required categories
+# ---------------------------------------------------------------------------
+
+
+_REQUIRED_CATEGORIES = [
+    {"name": "Other", "color": "#6B7280"},
+    {"name": "ATM Withdrawal", "color": "#4c4546"},
+]
+
+
+@router.post(
+    "/budget/categories/ensure-required",
+    response_model=EnsureRequiredResponse,
+)
+def ensure_required_categories(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Ensure 'Other' and 'ATM Withdrawal' categories exist. Idempotent."""
+    existing_names = {
+        row.name
+        for row in db.query(Category.name)
+        .filter(Category.user_id == user_id, Category.is_archived == False)  # noqa: E712
+        .all()
+    }
+
+    created: list[str] = []
+    for req in _REQUIRED_CATEGORIES:
+        if req["name"] not in existing_names:
+            cat = Category(user_id=user_id, name=req["name"], color=req["color"])
+            db.add(cat)
+            created.append(req["name"])
+
+    if created:
+        db.commit()
+
+    return {"created": created}
 
 
 # ---------------------------------------------------------------------------

@@ -3,9 +3,21 @@
 import { cn } from "@/lib/utils";
 
 const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  { value: 1, label: "Jan" },
+  { value: 2, label: "Feb" },
+  { value: 3, label: "Mar" },
+  { value: 4, label: "Apr" },
+  { value: 5, label: "May" },
+  { value: 6, label: "Jun" },
+  { value: 7, label: "Jul" },
+  { value: 8, label: "Aug" },
+  { value: 9, label: "Sep" },
+  { value: 10, label: "Oct" },
+  { value: 11, label: "Nov" },
+  { value: 12, label: "Dec" },
 ];
+
+const YEARS = [2026];
 
 type Period = "monthly" | "ytd" | "yearly" | "custom";
 
@@ -20,39 +32,32 @@ interface TimeAggregationProps {
   period: Period;
   month: number;
   year: number;
+  fromDate?: string;
+  toDate?: string;
   onPeriodChange: (period: Period) => void;
   onMonthChange: (month: number) => void;
   onYearChange: (year: number) => void;
+  onFromDateChange?: (date: string) => void;
+  onToDateChange?: (date: string) => void;
 }
 
 export type { Period };
+
+const selectClass =
+  "rounded-lg border border-on-surface-variant/20 bg-surface-container-lowest px-2 py-1 font-mono text-sm text-on-surface focus:outline-none focus:border-on-surface-variant/40 appearance-none cursor-pointer";
 
 export function TimeAggregation({
   period,
   month,
   year,
+  fromDate,
+  toDate,
   onPeriodChange,
   onMonthChange,
   onYearChange,
+  onFromDateChange,
+  onToDateChange,
 }: TimeAggregationProps) {
-  function handlePrevMonth() {
-    if (month === 1) {
-      onMonthChange(12);
-      onYearChange(year - 1);
-    } else {
-      onMonthChange(month - 1);
-    }
-  }
-
-  function handleNextMonth() {
-    if (month === 12) {
-      onMonthChange(1);
-      onYearChange(year + 1);
-    } else {
-      onMonthChange(month + 1);
-    }
-  }
-
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       {/* Segmented control */}
@@ -76,45 +81,67 @@ export function TimeAggregation({
       {/* Period selector */}
       {period === "monthly" && (
         <div className="flex items-center gap-2">
-          <button
-            onClick={handlePrevMonth}
-            className="rounded-lg px-2 py-1 font-mono text-sm text-on-surface-variant transition-colors hover:text-on-surface"
-            aria-label="Previous month"
+          <select
+            value={month}
+            onChange={(e) => onMonthChange(Number(e.target.value))}
+            className={selectClass}
           >
-            &larr;
-          </button>
-          <span className="min-w-[7rem] text-center font-mono text-sm text-on-surface">
-            {MONTHS[month - 1]} {year}
-          </span>
-          <button
-            onClick={handleNextMonth}
-            className="rounded-lg px-2 py-1 font-mono text-sm text-on-surface-variant transition-colors hover:text-on-surface"
-            aria-label="Next month"
+            {MONTHS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={year}
+            onChange={(e) => onYearChange(Number(e.target.value))}
+            className={selectClass}
           >
-            &rarr;
-          </button>
+            {YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
       {period === "yearly" && (
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => onYearChange(year - 1)}
-            className="rounded-lg px-2 py-1 font-mono text-sm text-on-surface-variant transition-colors hover:text-on-surface"
-            aria-label="Previous year"
+          <select
+            value={year}
+            onChange={(e) => onYearChange(Number(e.target.value))}
+            className={selectClass}
           >
-            &larr;
-          </button>
-          <span className="min-w-[4rem] text-center font-mono text-sm text-on-surface">
-            {year}
-          </span>
-          <button
-            onClick={() => onYearChange(year + 1)}
-            className="rounded-lg px-2 py-1 font-mono text-sm text-on-surface-variant transition-colors hover:text-on-surface"
-            aria-label="Next year"
-          >
-            &rarr;
-          </button>
+            {YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {period === "custom" && (
+        <div className="flex items-center gap-2">
+          <label className="font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant">
+            From
+          </label>
+          <input
+            type="date"
+            value={fromDate ?? ""}
+            onChange={(e) => onFromDateChange?.(e.target.value)}
+            className={selectClass}
+          />
+          <label className="font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant">
+            To
+          </label>
+          <input
+            type="date"
+            value={toDate ?? ""}
+            onChange={(e) => onToDateChange?.(e.target.value)}
+            className={selectClass}
+          />
         </div>
       )}
     </div>

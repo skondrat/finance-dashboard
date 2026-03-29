@@ -112,10 +112,12 @@ interface CategoryTableProps {
   period: string;
   month?: number;
   year?: number;
+  fromDate?: string;
+  toDate?: string;
 }
 
-export function CategoryTable({ period, month, year }: CategoryTableProps) {
-  const { data, isLoading } = useSpendByCategory(period, month, year);
+export function CategoryTable({ period, month, year, fromDate, toDate }: CategoryTableProps) {
+  const { data, isLoading } = useSpendByCategory(period, month, year, fromDate, toDate);
   const currency = useCurrencyStore((s) => s.currency);
 
   return (
