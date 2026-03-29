@@ -81,11 +81,41 @@ export interface ImportCategory {
   id: string;
   name: string;
   color: string;
+  monthly_budget?: number | null;
 }
 
 export interface CategoryOverride {
   row_index: number;
   category_id: string;
+}
+
+export interface CashSplitItem {
+  description: string;
+  amount: number;
+  category_id: string | null;
+  category_name: string | null;
+}
+
+export interface SplitAtmResponse {
+  items: CashSplitItem[];
+  remainder: number;
+}
+
+export interface SplitState {
+  original: ImportRow;
+  items: CashSplitItem[];
+  remainder: number;
+}
+
+export interface SplitConfirmItem {
+  description: string;
+  amount: number;
+  category_id: string | null;
+}
+
+export interface SplitOverride {
+  row_index: number;
+  items: SplitConfirmItem[];
 }
 
 export interface UploadParams {
@@ -375,19 +405,41 @@ export function useImportWithProgress() {
   return { progress, upload, reset };
 }
 
+export function useSplitAtmCash() {
+  return useMutation<
+    SplitAtmResponse,
+    Error,
+    { importId: string; rowIndex: number; notes: string }
+  >({
+    mutationFn: ({ importId, rowIndex, notes }) =>
+      apiFetch<SplitAtmResponse>(
+        `/budget/import/${importId}/split-atm-cash`,
+        {
+          method: "POST",
+          body: JSON.stringify({ row_index: rowIndex, notes }),
+        }
+      ),
+  });
+}
+
 export function useConfirmImport() {
   const queryClient = useQueryClient();
 
   return useMutation<
     { id: string; status: string; row_count: number; mappings_updated: number },
     Error,
-    { importId: string; categoryOverrides?: CategoryOverride[] }
+    {
+      importId: string;
+      categoryOverrides?: CategoryOverride[];
+      splits?: SplitOverride[];
+    }
   >({
-    mutationFn: ({ importId, categoryOverrides }) =>
+    mutationFn: ({ importId, categoryOverrides, splits }) =>
       apiFetch(`/budget/import/${importId}/confirm`, {
         method: "POST",
         body: JSON.stringify({
           category_overrides: categoryOverrides ?? null,
+          splits: splits ?? null,
         }),
       }),
     onSuccess: () => {
@@ -406,11 +458,30 @@ export function useImportCategories() {
   });
 }
 
+export function useCreateCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { id: string; name: string; color: string; monthly_budget: number | null },
+    Error,
+    { name: string; monthly_budget?: number }
+  >({
+    mutationFn: (data) =>
+      apiFetch("/budget/categories", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
+    },
+  });
+}
+
 export function useSeedCategoriesUpload() {
   const queryClient = useQueryClient();
 
   return useMutation<
-    { categories_loaded: number; examples_loaded: number },
+    { categories_loaded: number; examples_loaded: number; budgets_loaded: number },
     Error,
     File
   >({

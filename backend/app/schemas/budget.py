@@ -129,19 +129,55 @@ class ImportDetailResponse(BaseModel):
     rows: Optional[list[dict[str, Any]]] = None
 
 
+# ---------------------------------------------------------------------------
+# ATM cash split
+# ---------------------------------------------------------------------------
+
+
+class SplitAtmRequest(BaseModel):
+    row_index: int
+    notes: str
+
+
+class CashSplitItem(BaseModel):
+    description: str
+    amount: Decimal
+    category_id: Optional[str] = None
+    category_name: Optional[str] = None
+
+
+class SplitAtmResponse(BaseModel):
+    items: list[CashSplitItem]
+    remainder: Decimal
+
+
+class SplitConfirmItem(BaseModel):
+    description: str
+    amount: Decimal
+    category_id: Optional[str] = None
+
+
+class SplitOverride(BaseModel):
+    row_index: int
+    items: list[SplitConfirmItem]
+
+
 class ConfirmImportRequest(BaseModel):
     category_overrides: Optional[list[dict[str, Any]]] = None
+    splits: Optional[list[SplitOverride]] = None
 
 
 class ImportCategoryResponse(BaseModel):
     id: str
     name: str
     color: str
+    monthly_budget: Optional[Decimal] = None
 
 
 class SeedCategoriesResponse(BaseModel):
     categories_loaded: int
     examples_loaded: int
+    budgets_loaded: int = 0
 
 
 # ---------------------------------------------------------------------------

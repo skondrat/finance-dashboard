@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   useImportUpload,
@@ -8,10 +8,15 @@ import {
   useConfirmImport,
   useImportCategories,
   useSeedCategoriesUpload,
+  useCreateCategory,
+  useSplitAtmCash,
   type ImportResponse,
   type ImportRow,
   type CategoryOverride,
   type ImportCategory,
+  type SplitState,
+  type CashSplitItem,
+  type SplitOverride,
 } from "@/lib/queries/budget";
 import { cn, formatCurrency } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
@@ -81,12 +86,22 @@ function PreviewTable({
   categories,
   overrides,
   onOverride,
+  splitStates,
+  onSplitCategoryChange,
+  onStartSplit,
+  onUndoSplit,
+  splittingRowIndex,
 }: {
   data: ImportResponse;
   currency: string;
   categories: ImportCategory[];
   overrides: Map<number, string | null>;
   onOverride: (rowIndex: number, categoryId: string | null) => void;
+  splitStates: Map<number, SplitState>;
+  onSplitCategoryChange: (rowIndex: number, itemIndex: number, categoryId: string | null) => void;
+  onStartSplit: (rowIndex: number) => void;
+  onUndoSplit: (rowIndex: number) => void;
+  splittingRowIndex: number | null;
 }) {
   return (
     <div className="max-h-72 overflow-y-auto">
@@ -119,6 +134,105 @@ function PreviewTable({
         </thead>
         <tbody>
           {data.rows.map((row, idx) => {
+            const split = splitStates.get(idx);
+
+            // If this row has been split, render split items instead
+            if (split) {
+              const colSpan = data.source ? 6 : 4;
+              return (
+                <React.Fragment key={idx}>
+                  {split.items.map((item, itemIdx) => {
+                    const isOther = item.category_name === "Other";
+                    return (
+                      <tr
+                        key={`${idx}-split-${itemIdx}`}
+                        className={cn(
+                          "border-b border-on-surface-variant/5",
+                          isOther && "bg-on-error-container/5"
+                        )}
+                      >
+                        <td className="py-2 pl-4 font-mono text-xs text-on-surface-variant">
+                          {row.date}
+                        </td>
+                        <td className="py-2 pl-4 font-body text-sm text-on-surface max-w-48 truncate">
+                          <span className="text-on-surface-variant/50 mr-1">{"\u21B3"}</span>
+                          {item.description}
+                        </td>
+                        <td className="py-2 text-right font-mono text-sm text-on-error-container">
+                          {formatCurrency(-Math.abs(item.amount), row.currency || currency)}
+                        </td>
+                        {data.source && (
+                          <>
+                            <td className="py-2 font-mono text-xs text-on-surface-variant">
+                              {row.currency}
+                            </td>
+                            <td className="py-2 font-mono text-xs text-on-surface-variant capitalize">
+                              {row.type}
+                            </td>
+                          </>
+                        )}
+                        <td className="py-2">
+                          {categories.length > 0 ? (
+                            <div className="flex items-center">
+                              <CategorySelector
+                                categories={categories}
+                                selectedId={item.category_id}
+                                onChange={(id) => onSplitCategoryChange(idx, itemIdx, id)}
+                              />
+                              <CategorySourceBadge source="ai" />
+                            </div>
+                          ) : (
+                            <span className="font-mono text-xs text-on-surface-variant">
+                              {item.category_name ?? "\u2014"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {split.remainder > 0 && (
+                    <tr className="border-b border-on-surface-variant/5">
+                      <td className="py-2 pl-4 font-mono text-xs text-on-surface-variant">
+                        {row.date}
+                      </td>
+                      <td className="py-2 pl-4 font-body text-sm text-on-surface max-w-48 truncate">
+                        <span className="text-on-surface-variant/50 mr-1">{"\u21B3"}</span>
+                        {row.description}
+                        <span className="ml-1 text-on-surface-variant/50 text-xs">(remainder)</span>
+                      </td>
+                      <td className="py-2 text-right font-mono text-sm text-on-error-container">
+                        {formatCurrency(-Math.abs(split.remainder), row.currency || currency)}
+                      </td>
+                      {data.source && (
+                        <>
+                          <td className="py-2 font-mono text-xs text-on-surface-variant">
+                            {row.currency}
+                          </td>
+                          <td className="py-2 font-mono text-xs text-on-surface-variant capitalize">
+                            {row.type}
+                          </td>
+                        </>
+                      )}
+                      <td className="py-2">
+                        <span className="font-mono text-xs text-on-surface-variant">ATM Withdrawal</span>
+                        <CategorySourceBadge source="rule" />
+                      </td>
+                    </tr>
+                  )}
+                  <tr className="border-b border-on-surface-variant/5">
+                    <td colSpan={colSpan} className="py-1">
+                      <button
+                        onClick={() => onUndoSplit(idx)}
+                        className="font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant/60 hover:text-on-surface-variant transition-colors"
+                      >
+                        Undo Split
+                      </button>
+                    </td>
+                  </tr>
+                </React.Fragment>
+              );
+            }
+
             const overriddenCatId = overrides.get(idx);
             const currentCatId =
               overriddenCatId !== undefined
@@ -130,67 +244,80 @@ function PreviewTable({
                   null
                 : row.category_name;
             const isOther = currentCatName === "Other";
+            const isAtm = row.category_name === "ATM Withdrawal" && overriddenCatId === undefined;
+            const isSplitting = splittingRowIndex === idx;
 
             return (
-              <tr
-                key={idx}
-                className={cn(
-                  "border-b border-on-surface-variant/5 last:border-0",
-                  isOther && "bg-on-error-container/5"
-                )}
-              >
-                <td className="py-2 font-mono text-xs text-on-surface">
-                  {row.date}
-                </td>
-                <td className="py-2 font-body text-sm text-on-surface max-w-48 truncate">
-                  {row.description}
-                </td>
-                <td
+              <React.Fragment key={idx}>
+                <tr
                   className={cn(
-                    "py-2 text-right font-mono text-sm",
-                    row.amount < 0
-                      ? "text-on-error-container"
-                      : "text-on-tertiary-container"
+                    "border-b border-on-surface-variant/5 last:border-0",
+                    isOther && "bg-on-error-container/5"
                   )}
                 >
-                  {formatCurrency(row.amount, row.currency || currency)}
-                </td>
-                {data.source && (
-                  <>
-                    <td className="py-2 font-mono text-xs text-on-surface-variant">
-                      {row.currency}
-                    </td>
-                    <td className="py-2 font-mono text-xs text-on-surface-variant capitalize">
-                      {row.type}
-                    </td>
-                  </>
-                )}
-                <td className="py-2">
-                  {categories.length > 0 ? (
-                    <div className="flex items-center">
-                      <CategorySelector
-                        categories={categories}
-                        selectedId={currentCatId}
-                        onChange={(id) => onOverride(idx, id)}
-                      />
-                      <CategorySourceBadge
-                        source={
-                          overriddenCatId !== undefined
-                            ? "mapping"
-                            : row.category_source
-                        }
-                      />
-                    </div>
-                  ) : (
-                    <span className="font-mono text-xs text-on-surface-variant">
-                      {currentCatName ?? "\u2014"}
-                      {row.category_source !== "none" && (
-                        <CategorySourceBadge source={row.category_source} />
-                      )}
-                    </span>
+                  <td className="py-2 font-mono text-xs text-on-surface">
+                    {row.date}
+                  </td>
+                  <td className="py-2 font-body text-sm text-on-surface max-w-48 truncate">
+                    {row.description}
+                  </td>
+                  <td
+                    className={cn(
+                      "py-2 text-right font-mono text-sm",
+                      row.amount < 0
+                        ? "text-on-error-container"
+                        : "text-on-tertiary-container"
+                    )}
+                  >
+                    {formatCurrency(row.amount, row.currency || currency)}
+                  </td>
+                  {data.source && (
+                    <>
+                      <td className="py-2 font-mono text-xs text-on-surface-variant">
+                        {row.currency}
+                      </td>
+                      <td className="py-2 font-mono text-xs text-on-surface-variant capitalize">
+                        {row.type}
+                      </td>
+                    </>
                   )}
-                </td>
-              </tr>
+                  <td className="py-2">
+                    <div className="flex items-center gap-1">
+                      {categories.length > 0 ? (
+                        <>
+                          <CategorySelector
+                            categories={categories}
+                            selectedId={currentCatId}
+                            onChange={(id) => onOverride(idx, id)}
+                          />
+                          <CategorySourceBadge
+                            source={
+                              overriddenCatId !== undefined
+                                ? "mapping"
+                                : row.category_source
+                            }
+                          />
+                        </>
+                      ) : (
+                        <span className="font-mono text-xs text-on-surface-variant">
+                          {currentCatName ?? "\u2014"}
+                          {row.category_source !== "none" && (
+                            <CategorySourceBadge source={row.category_source} />
+                          )}
+                        </span>
+                      )}
+                      {isAtm && !isSplitting && (
+                        <button
+                          onClick={() => onStartSplit(idx)}
+                          className="ml-1 rounded bg-on-surface-variant/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.05em] text-on-surface-variant hover:bg-on-surface-variant/20 transition-colors"
+                        >
+                          Split
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              </React.Fragment>
             );
           })}
         </tbody>
@@ -199,37 +326,70 @@ function PreviewTable({
   );
 }
 
-function SeedCategoriesUpload({
+function InitCategories({
+  categories,
   onComplete,
 }: {
+  categories: ImportCategory[];
   onComplete: () => void;
 }) {
   const seedMutation = useSeedCategoriesUpload();
+  const createMutation = useCreateCategory();
+  const [newName, setNewName] = useState("");
+  const [newBudget, setNewBudget] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
 
   const { getRootProps, getInputProps } = useDropzone({
     onDrop: (files) => {
       const file = files[0];
       if (!file) return;
-      seedMutation.mutate(file, { onSuccess: onComplete });
+      seedMutation.mutate(file);
     },
     accept: { "text/csv": [".csv"] },
     multiple: false,
   });
 
+  function handleAddCategory() {
+    const name = newName.trim();
+    if (!name) return;
+
+    setAddError(null);
+    const budget = newBudget.trim() ? parseFloat(newBudget) : undefined;
+
+    createMutation.mutate(
+      { name, monthly_budget: budget },
+      {
+        onSuccess: () => {
+          setNewName("");
+          setNewBudget("");
+        },
+        onError: (err) => {
+          setAddError(err.message);
+        },
+      }
+    );
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <p className="font-body text-sm text-on-surface-variant">
-        No categories found. Upload a seed categories CSV to get started.
+        Set up your spending categories before importing statements.
       </p>
+
+      {/* CSV Upload */}
       <div
         {...getRootProps()}
         className="flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl outline-2 outline-dashed outline-on-surface-variant/40 transition-colors hover:bg-surface-container-low"
       >
         <input {...getInputProps()} />
         <p className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
-          Drop CSV here
+          Drop categories CSV here
+        </p>
+        <p className="mt-1 font-body text-[11px] text-on-surface-variant/60">
+          Columns: Categories (required), Examples, Budget (optional)
         </p>
       </div>
+
       {seedMutation.isPending && (
         <p className="text-center font-mono text-xs text-on-surface-variant animate-pulse">
           Uploading...
@@ -244,13 +404,93 @@ function SeedCategoriesUpload({
         <p className="text-center font-mono text-xs text-on-tertiary-container">
           Loaded {seedMutation.data.categories_loaded} categories,{" "}
           {seedMutation.data.examples_loaded} examples
+          {seedMutation.data.budgets_loaded > 0 &&
+            `, ${seedMutation.data.budgets_loaded} budgets`}
         </p>
       )}
+
+      {/* Category list */}
+      {categories.length > 0 && (
+        <div className="max-h-48 overflow-y-auto rounded-xl border border-on-surface-variant/10 p-3">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-on-surface-variant/10">
+                <th className="pb-2 text-left font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant">
+                  Category
+                </th>
+                <th className="pb-2 text-right font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant">
+                  Budget
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((cat) => (
+                <tr
+                  key={cat.id}
+                  className="border-b border-on-surface-variant/5 last:border-0"
+                >
+                  <td className="py-1.5 font-body text-sm text-on-surface">
+                    {cat.name}
+                  </td>
+                  <td className="py-1.5 text-right font-mono text-xs text-on-surface-variant">
+                    {cat.monthly_budget != null
+                      ? `\u20AC${Number(cat.monthly_budget).toFixed(2)}`
+                      : "\u2014"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Manual add form */}
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <label className="font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant">
+            Category name
+          </label>
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
+            placeholder="e.g. Groceries"
+            className="mt-1 w-full rounded-lg border border-on-surface-variant/20 bg-surface-container-lowest px-3 py-2 font-body text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:border-on-surface-variant/40"
+          />
+        </div>
+        <div className="w-28">
+          <label className="font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant">
+            Budget (\u20AC)
+          </label>
+          <input
+            type="number"
+            value={newBudget}
+            onChange={(e) => setNewBudget(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
+            placeholder="0.00"
+            className="mt-1 w-full rounded-lg border border-on-surface-variant/20 bg-surface-container-lowest px-3 py-2 font-body text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:border-on-surface-variant/40"
+          />
+        </div>
+        <button
+          onClick={handleAddCategory}
+          disabled={!newName.trim() || createMutation.isPending}
+          className="rounded-lg bg-on-surface px-3 py-2 font-mono text-xs uppercase tracking-[0.1em] text-surface transition-colors hover:bg-on-surface/90 disabled:opacity-50"
+        >
+          Add
+        </button>
+      </div>
+      {addError && (
+        <p className="font-mono text-xs text-on-error-container">{addError}</p>
+      )}
+
+      {/* Continue to Import */}
       <button
         onClick={onComplete}
-        className="w-full rounded-xl px-4 py-2 font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:text-on-surface"
+        disabled={categories.length === 0}
+        className="w-full rounded-xl bg-on-surface px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-surface transition-colors hover:bg-on-surface/90 disabled:opacity-50"
       >
-        Skip for now
+        Continue to Import
       </button>
     </div>
   );
@@ -261,15 +501,22 @@ export function ImportModal() {
   const [preview, setPreview] = useState<ImportResponse | null>(null);
   const [selectedSource, setSelectedSource] = useState<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [showSeedUpload, setShowSeedUpload] = useState(false);
+  const [showInit, setShowInit] = useState(false);
   const [overrides, setOverrides] = useState<Map<number, string | null>>(
     new Map()
   );
+  const [splitStates, setSplitStates] = useState<Map<number, SplitState>>(
+    new Map()
+  );
+  const [splittingRowIndex, setSplittingRowIndex] = useState<number | null>(null);
+  const [splitNotes, setSplitNotes] = useState("");
+  const [splitError, setSplitError] = useState<string | null>(null);
   const currency = useCurrencyStore((s) => s.currency);
 
   const uploadMutation = useImportUpload();
   const { progress: sseProgress, upload: sseUpload, reset: sseReset } = useImportWithProgress();
   const confirmMutation = useConfirmImport();
+  const splitMutation = useSplitAtmCash();
   const { data: categoriesData } = useImportCategories();
   const categories = categoriesData?.categories ?? [];
 
@@ -348,6 +595,85 @@ export function ImportModal() {
     });
   }
 
+  function handleStartSplit(rowIndex: number) {
+    setSplittingRowIndex(rowIndex);
+    setSplitNotes("");
+    setSplitError(null);
+  }
+
+  function handleSubmitSplit() {
+    if (!preview || splittingRowIndex === null) return;
+
+    // Client-side validation: notes must contain at least one number
+    if (!/\d+/.test(splitNotes)) {
+      setSplitError("Notes must contain at least one numeric amount");
+      return;
+    }
+
+    setSplitError(null);
+    splitMutation.mutate(
+      {
+        importId: preview.id,
+        rowIndex: splittingRowIndex,
+        notes: splitNotes,
+      },
+      {
+        onSuccess: (result) => {
+          const row = preview.rows[splittingRowIndex!];
+          setSplitStates((prev) => {
+            const next = new Map(prev);
+            next.set(splittingRowIndex!, {
+              original: row,
+              items: result.items,
+              remainder: result.remainder,
+            });
+            return next;
+          });
+          setSplittingRowIndex(null);
+          setSplitNotes("");
+        },
+        onError: (err) => {
+          setSplitError(err.message);
+        },
+      }
+    );
+  }
+
+  function handleCancelSplit() {
+    setSplittingRowIndex(null);
+    setSplitNotes("");
+    setSplitError(null);
+  }
+
+  function handleUndoSplit(rowIndex: number) {
+    setSplitStates((prev) => {
+      const next = new Map(prev);
+      next.delete(rowIndex);
+      return next;
+    });
+  }
+
+  function handleSplitCategoryChange(
+    rowIndex: number,
+    itemIndex: number,
+    categoryId: string | null
+  ) {
+    setSplitStates((prev) => {
+      const next = new Map(prev);
+      const split = next.get(rowIndex);
+      if (!split) return prev;
+      const newItems = [...split.items];
+      const catName = categories.find((c) => c.id === categoryId)?.name ?? null;
+      newItems[itemIndex] = {
+        ...newItems[itemIndex],
+        category_id: categoryId,
+        category_name: catName,
+      };
+      next.set(rowIndex, { ...split, items: newItems });
+      return next;
+    });
+  }
+
   function handleConfirm() {
     if (!preview) return;
 
@@ -358,16 +684,41 @@ export function ImportModal() {
       }
     });
 
+    // Build splits payload from splitStates
+    const splits: SplitOverride[] = [];
+    splitStates.forEach((split, rowIndex) => {
+      const items = split.items.map((item) => ({
+        description: item.description,
+        amount: item.amount,
+        category_id: item.category_id,
+      }));
+      // Add remainder as an ATM Withdrawal item if > 0
+      if (split.remainder > 0) {
+        const originalRow = preview.rows[rowIndex];
+        const atmCatId = originalRow?.category_id ?? null;
+        items.push({
+          description: originalRow?.description ?? "ATM Withdrawal",
+          amount: split.remainder,
+          category_id: atmCatId,
+        });
+      }
+      splits.push({ row_index: rowIndex, items });
+    });
+
     confirmMutation.mutate(
       {
         importId: preview.id,
         categoryOverrides:
           categoryOverrides.length > 0 ? categoryOverrides : undefined,
+        splits: splits.length > 0 ? splits : undefined,
       },
       {
         onSuccess: () => {
           setPreview(null);
           setOverrides(new Map());
+          setSplitStates(new Map());
+          setSplittingRowIndex(null);
+          setSplitNotes("");
           setSelectedFile(null);
           setSelectedSource("");
           setIsOpen(false);
@@ -389,6 +740,9 @@ export function ImportModal() {
     discardOnBackend();
     setPreview(null);
     setOverrides(new Map());
+    setSplitStates(new Map());
+    setSplittingRowIndex(null);
+    setSplitNotes("");
     setSelectedFile(null);
     setSelectedSource("");
     uploadMutation.reset();
@@ -401,9 +755,12 @@ export function ImportModal() {
     }
     setPreview(null);
     setOverrides(new Map());
+    setSplitStates(new Map());
+    setSplittingRowIndex(null);
+    setSplitNotes("");
     setSelectedFile(null);
     setSelectedSource("");
-    setShowSeedUpload(false);
+    setShowInit(false);
     uploadMutation.reset();
     sseReset();
     setIsOpen(false);
@@ -429,7 +786,12 @@ export function ImportModal() {
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setIsOpen(true);
+          if (categories.length === 0) {
+            setShowInit(true);
+          }
+        }}
         className="rounded-xl bg-on-surface px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-surface transition-colors hover:bg-on-surface/90"
       >
         Import Statement
@@ -449,9 +811,10 @@ export function ImportModal() {
               Import Statement
             </h2>
 
-            {showSeedUpload ? (
-              <SeedCategoriesUpload
-                onComplete={() => setShowSeedUpload(false)}
+            {showInit ? (
+              <InitCategories
+                categories={categories}
+                onComplete={() => setShowInit(false)}
               />
             ) : !preview ? (
               <>
@@ -547,30 +910,6 @@ export function ImportModal() {
                   </p>
                 )}
 
-                {/* Seed categories link */}
-                <div className="mt-3 flex items-center justify-center gap-1.5">
-                  <button
-                    onClick={() => setShowSeedUpload(true)}
-                    className="font-mono text-xs text-on-surface-variant/60 transition-colors hover:text-on-surface-variant"
-                  >
-                    Upload seed categories CSV
-                  </button>
-                  <div className="group relative">
-                    <span className="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-on-surface-variant/30 font-mono text-[10px] leading-none text-on-surface-variant/50 transition-colors group-hover:border-on-surface-variant group-hover:text-on-surface-variant">
-                      i
-                    </span>
-                    <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg bg-on-surface px-3 py-2 text-left opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                      <p className="font-mono text-[11px] leading-relaxed text-surface">
-                        CSV with two columns:<br />
-                        <span className="text-surface/70">Categories</span> — category name (required)<br />
-                        <span className="text-surface/70">Examples</span> — descriptions, pipe-separated (optional)<br />
-                        <br />
-                        <span className="text-surface/50">e.g. Food &amp; Dining,uber eats|mcdonalds</span>
-                      </p>
-                      <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-on-surface" />
-                    </div>
-                  </div>
-                </div>
               </>
             ) : (
               <>
@@ -611,7 +950,49 @@ export function ImportModal() {
                   categories={categories}
                   overrides={overrides}
                   onOverride={handleOverride}
+                  splitStates={splitStates}
+                  onSplitCategoryChange={handleSplitCategoryChange}
+                  onStartSplit={handleStartSplit}
+                  onUndoSplit={handleUndoSplit}
+                  splittingRowIndex={splittingRowIndex}
                 />
+
+                {/* Split input */}
+                {splittingRowIndex !== null && (
+                  <div className="mt-3 rounded-xl border border-on-surface-variant/20 bg-surface-container-low p-3 space-y-2">
+                    <p className="font-mono text-xs text-on-surface-variant">
+                      Enter cash spending notes for row {splittingRowIndex + 1}:
+                    </p>
+                    <textarea
+                      value={splitNotes}
+                      onChange={(e) => setSplitNotes(e.target.value)}
+                      placeholder="e.g. 200 cosmetics, 50 taxi, 30 groceries"
+                      className="w-full rounded-lg border border-on-surface-variant/20 bg-surface-container-lowest px-3 py-2 font-body text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:border-on-surface-variant/40"
+                      rows={2}
+                    />
+                    {splitError && (
+                      <p className="font-mono text-xs text-on-error-container">
+                        {splitError}
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSubmitSplit}
+                        disabled={splitMutation.isPending || !splitNotes.trim()}
+                        className="rounded-lg bg-on-surface px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-surface transition-colors hover:bg-on-surface/90 disabled:opacity-50"
+                      >
+                        {splitMutation.isPending ? "Splitting..." : "Split Cash"}
+                      </button>
+                      <button
+                        onClick={handleCancelSplit}
+                        disabled={splitMutation.isPending}
+                        className="rounded-lg px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:text-on-surface"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="mt-6 flex items-center justify-end gap-3">

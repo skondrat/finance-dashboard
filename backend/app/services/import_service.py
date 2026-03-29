@@ -240,10 +240,11 @@ def confirm_import(
     db: Session,
     import_record: StatementImport,
     category_overrides: list[dict] | None = None,
+    splits: list[dict] | None = None,
 ) -> dict:
     """Mark an import as confirmed – its transactions become permanent.
 
-    Applies any category overrides and saves mappings to the MD file.
+    Applies any category overrides and splits, then saves mappings to the MD file.
     """
     if import_record.status != "preview":
         raise ValueError(f"Cannot confirm import with status '{import_record.status}'")
@@ -262,6 +263,61 @@ def confirm_import(
             new_category_id = override.get("category_id")
             if row_index is not None and 0 <= row_index < len(transactions):
                 transactions[row_index].category_id = new_category_id
+
+    # Apply ATM cash splits
+    if splits:
+        for split in splits:
+            row_index = split.get("row_index")
+            split_items = split.get("items", [])
+            if row_index is None or row_index < 0 or row_index >= len(transactions):
+                continue
+
+            original_tx = transactions[row_index]
+
+            # Create new transactions for each split item
+            for item in split_items:
+                item_amount = Decimal(str(item["amount"]))
+                # Make amount negative if the original was negative (expenses)
+                if original_tx.amount < 0:
+                    item_amount = -abs(item_amount)
+
+                new_tx = BudgetTransaction(
+                    id=str(uuid.uuid4()),
+                    user_id=import_record.user_id,
+                    import_id=import_record.id,
+                    category_id=item.get("category_id"),
+                    date=original_tx.date,
+                    description=item["description"],
+                    amount=item_amount,
+                    currency=original_tx.currency,
+                    reference=original_tx.reference,
+                    is_investment=False,
+                    dedup_hash=_compute_dedup_hash(
+                        str(original_tx.date),
+                        str(item_amount),
+                        item["description"],
+                    ),
+                )
+                db.add(new_tx)
+
+            # Delete the original ATM transaction
+            db.delete(original_tx)
+
+        # Update row count
+        db.flush()
+        new_count = (
+            db.query(BudgetTransaction)
+            .filter(BudgetTransaction.import_id == import_record.id)
+            .count()
+        )
+        import_record.row_count = new_count
+
+    # Reload transactions after splits (list may have changed)
+    transactions = (
+        db.query(BudgetTransaction)
+        .filter(BudgetTransaction.import_id == import_record.id)
+        .all()
+    )
 
     # Save description->category mappings to MD file
     mappings_updated = 0

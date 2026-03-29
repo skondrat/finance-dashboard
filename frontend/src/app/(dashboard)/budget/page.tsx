@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { BudgetKpiStrip } from "@/components/budget/kpi-strip";
 import { TimeAggregation, type Period } from "@/components/budget/time-aggregation";
 import { CategoryTable } from "@/components/budget/category-table";
 import { ImportModal } from "@/components/budget/import-modal";
 import { IncomeManager } from "@/components/budget/income-manager";
+import { DebugMenu } from "@/components/budget/debug-menu";
 
 export default function BudgetPage() {
   const now = new Date();
@@ -55,6 +57,8 @@ export default function BudgetPage() {
               Spending trend charts coming in Phase 8.
             </p>
           </div>
+
+          <DebugMenu />
         </div>
       </div>
     </div>
