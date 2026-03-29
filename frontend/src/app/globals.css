@@ -40,6 +40,7 @@
   --on-tertiary-container: #4ddfaa;
   --error-container: #4d1f1a;
   --on-error-container: #ff6b6b;
+  --shadow-color: rgba(0, 0, 0, 0.3);
 }
 
 @theme inline {
@@ -71,7 +72,7 @@
   --radius-xl: 0.75rem;
 
   /* Shadows */
-  --shadow-ambient: 0 8px 40px -4px rgba(26, 28, 28, 0.06);
+  --shadow-ambient: 0 8px 40px -4px var(--shadow-color, rgba(26, 28, 28, 0.06));
 }
 
 body {

@@ -12,20 +12,20 @@ import { useCategoryDistribution } from "@/lib/queries/budget-charts";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { formatCurrency } from "@/lib/utils";
 
-// Monochromatic palette with green accent for savings-like categories
+// Monochromatic palette — mid-range grays visible on both light and dark backgrounds
 const MONO_PALETTE = [
-  "#1a1a1a",
-  "#333333",
-  "#4d4d4d",
-  "#666666",
-  "#808080",
-  "#999999",
-  "#b3b3b3",
-  "#cccccc",
+  "#6b7280",
+  "#4b5563",
+  "#9ca3af",
+  "#374151",
+  "#78716c",
+  "#a1a1aa",
+  "#57534e",
+  "#d4d4d8",
   "#009668",
-  "#d4d4d4",
-  "#a3a3a3",
-  "#737373",
+  "#71717a",
+  "#52525b",
+  "#a8a29e",
 ];
 
 interface CustomTooltipProps {
