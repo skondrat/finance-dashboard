@@ -1,7 +1,7 @@
 """
 Seed categories service (T030, T031).
 
-Parse CSV with "Categories" column and optional "Examples" column,
+Parse CSV with "Categories" column and optional "Examples" and "Budget" columns,
 create Category records, and pre-populate category_mappings.md.
 """
 
@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import io
 import uuid
+from decimal import Decimal, InvalidOperation
 
 from sqlalchemy.orm import Session
 
@@ -19,7 +20,7 @@ from app.models.category import Category
 def parse_seed_csv(file_content: bytes) -> list[dict]:
     """Parse seed categories CSV.
 
-    Returns list of dicts with 'category' and optional 'examples' keys.
+    Returns list of dicts with 'category', optional 'examples', and optional 'budget' keys.
     Raises ValueError if CSV is invalid or missing 'Categories' column.
     """
     text = file_content.decode("utf-8-sig")  # Handle BOM
@@ -35,6 +36,7 @@ def parse_seed_csv(file_content: bytes) -> list[dict]:
 
     cat_field = field_map["categories"]
     examples_field = field_map.get("examples")
+    budget_field = field_map.get("budget")
 
     results = []
     for row in reader:
@@ -46,7 +48,14 @@ def parse_seed_csv(file_content: bytes) -> list[dict]:
         if examples_field and row.get(examples_field):
             examples = [e.strip() for e in row[examples_field].split("|") if e.strip()]
 
-        results.append({"category": category, "examples": examples})
+        budget = None
+        if budget_field and row.get(budget_field, "").strip():
+            try:
+                budget = Decimal(row[budget_field].strip())
+            except InvalidOperation:
+                continue  # Skip rows with non-numeric budget
+
+        results.append({"category": category, "examples": examples, "budget": budget})
 
     return results
 
@@ -58,12 +67,13 @@ def load_seed_categories(
 ) -> dict:
     """Create Category records and pre-populate mappings.
 
-    Returns dict with categories_loaded and examples_loaded counts.
+    Returns dict with categories_loaded, examples_loaded, and budgets_loaded counts.
     """
     from app.services.mapping_file_service import save_bulk_mappings
 
     categories_loaded = 0
     examples_loaded = 0
+    budgets_loaded = 0
     all_mappings: dict[str, str] = {}
 
     for item in parsed:
@@ -81,9 +91,12 @@ def load_seed_categories(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
                 name=cat_name,
+                monthly_budget=item.get("budget"),
             )
             db.add(new_cat)
             categories_loaded += 1
+            if item.get("budget") is not None:
+                budgets_loaded += 1
 
         # Pre-populate mappings from examples
         for example in item.get("examples", []):
@@ -96,4 +109,8 @@ def load_seed_categories(
     if all_mappings:
         save_bulk_mappings(all_mappings)
 
-    return {"categories_loaded": categories_loaded, "examples_loaded": examples_loaded}
+    return {
+        "categories_loaded": categories_loaded,
+        "examples_loaded": examples_loaded,
+        "budgets_loaded": budgets_loaded,
+    }

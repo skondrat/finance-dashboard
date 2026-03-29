@@ -13,6 +13,9 @@ Auto-generated from all feature plans. Last updated: 2026-03-29
 - TypeScript 5 (frontend only) + Next.js, Reac (006-auto-match-categories)
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, anthropic (backend); Next.js 16, TanStack Query, Zustand (frontend) (007-categorization-quality)
 - SQLite via SQLAlchemy (no schema changes) (007-categorization-quality)
+- Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, anthropic SDK (backend); Next.js 16, TanStack Query, Zustand (frontend) (008-atm-cash-categorization)
+- Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query, Zustand (frontend) (009-init-categories-flow)
+- SQLite via SQLAlchemy (no schema changes — `monthly_budget` field already exists on Category) (009-init-categories-flow)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -32,9 +35,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 009-init-categories-flow: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query, Zustand (frontend)
+- 008-atm-cash-categorization: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, anthropic SDK (backend); Next.js 16, TanStack Query, Zustand (frontend)
 - 007-categorization-quality: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, anthropic (backend); Next.js 16, TanStack Query, Zustand (frontend)
-- 006-auto-match-categories: Added TypeScript 5 (frontend only) + Next.js, Reac
-- 005-fix-import-discard: Added TypeScript 5 (frontend only) + Next.js, TanStack Query
 
 
 <!-- MANUAL ADDITIONS START -->

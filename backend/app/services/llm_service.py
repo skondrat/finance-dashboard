@@ -256,6 +256,101 @@ Column indices are 0-based. For date_format, use Python strftime format (e.g., "
         return None
 
 
+# ---------------------------------------------------------------------------
+# ATM cash split parsing
+# ---------------------------------------------------------------------------
+
+
+class _CashExpense(pydantic.BaseModel):
+    """A single cash expense parsed from user notes."""
+    description: str = pydantic.Field(description="Short description of the expense as written in the notes (e.g., 'cosmetics', 'taxi')")
+    amount: float = pydantic.Field(description="Numeric amount spent on this item, must be positive")
+    category_name: str = pydantic.Field(description="Best-matching category name from the provided list, or 'Other' if no match")
+
+
+class _CashSplitResult(pydantic.BaseModel):
+    """Structured result of parsing cash spending notes."""
+    expenses: list[_CashExpense]
+
+
+def parse_cash_notes(
+    notes: str,
+    atm_amount: float,
+    known_categories: list[str],
+) -> list[dict] | None:
+    """Parse free-text cash spending notes into structured expense items.
+
+    Uses a single LLM call with structured output to extract amounts,
+    descriptions, and match to existing categories.
+
+    Args:
+        notes: User's free-text spending notes (e.g., "200 cosmetics, 50 taxi").
+        atm_amount: The total ATM withdrawal amount (for context).
+        known_categories: List of existing category names to match against.
+
+    Returns:
+        List of dicts with keys: description, amount, category_name.
+        Returns None on failure.
+    """
+    if not is_available():
+        return None
+
+    categories_text = ", ".join(known_categories) if known_categories else "Other"
+
+    prompt = (
+        "You are a financial expense categorizer. A user withdrew cash from an ATM "
+        f"(total: {atm_amount}) and provided notes about how they spent it.\n\n"
+        f"User's notes: \"{notes}\"\n\n"
+        f"Available budget categories: {categories_text}\n\n"
+        "Parse the notes into individual expenses. For each expense:\n"
+        "1. Extract the description (the short text the user wrote, e.g., 'cosmetics', 'taxi')\n"
+        "2. Extract the numeric amount\n"
+        "3. Match it to the best-fitting category from the list above. "
+        "If no category fits, use 'Other'.\n\n"
+        "Only include items that have an explicit numeric amount in the notes."
+    )
+
+    def _call_llm() -> list[dict] | None:
+        client = _get_client()
+        response = client.messages.parse(
+            model=settings.LLM_MODEL,
+            max_tokens=1000,
+            timeout=30.0,
+            messages=[{"role": "user", "content": prompt}],
+            output_format=_CashSplitResult,
+        )
+
+        logger.info(
+            "LLM parse_cash_notes: input_tokens=%d, output_tokens=%d",
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+        )
+
+        parsed = response.parsed_output
+        if not parsed or not parsed.expenses:
+            return None
+
+        return [exp.model_dump() for exp in parsed.expenses]
+
+    try:
+        return _call_llm()
+    except (anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
+        logger.warning("LLM parse_cash_notes failed, retrying: %s", e)
+        try:
+            return _call_llm()
+        except Exception:
+            logger.error("LLM parse_cash_notes retry also failed")
+            return None
+    except Exception:
+        logger.exception("LLM parse_cash_notes failed")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# PDF transaction extraction
+# ---------------------------------------------------------------------------
+
+
 class _Transaction(pydantic.BaseModel):
     """A single transaction extracted from a bank statement."""
     date: str = pydantic.Field(description="Transaction date in YYYY-MM-DD format")

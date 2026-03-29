@@ -14,7 +14,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id
 from app.database import get_db
+from app.models.auto_cat_rule import AutoCatRule
 from app.models.bank_profile import BankProfile
+from app.models.budget_transaction import BudgetTransaction
 from app.models.category import Category
 from app.models.statement_import import StatementImport
 from app.schemas.budget import (
@@ -24,6 +26,9 @@ from app.schemas.budget import (
     ImportDetailResponse,
     ImportUploadResponse,
     SeedCategoriesResponse,
+    SplitAtmRequest,
+    SplitAtmResponse,
+    CashSplitItem,
 )
 from app.services import import_service
 
@@ -213,7 +218,12 @@ def list_import_categories(
     )
     return {
         "categories": [
-            {"id": c.id, "name": c.name, "color": c.color}
+            {
+                "id": c.id,
+                "name": c.name,
+                "color": c.color,
+                "monthly_budget": float(c.monthly_budget) if c.monthly_budget else None,
+            }
             for c in categories
         ]
     }
@@ -249,6 +259,114 @@ async def upload_seed_categories(
 
     result = load_seed_categories(db, user_id, parsed)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Split ATM cash
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/budget/import/{import_id}/split-atm-cash",
+    response_model=SplitAtmResponse,
+    status_code=status.HTTP_200_OK,
+)
+def split_atm_cash(
+    import_id: str,
+    payload: SplitAtmRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Parse cash spending notes for an ATM Withdrawal row via LLM."""
+    import re
+    from decimal import Decimal
+
+    from app.services import llm_service
+
+    # Validate import exists and is in preview
+    stmt_import = (
+        db.query(StatementImport)
+        .filter(StatementImport.id == import_id, StatementImport.user_id == user_id)
+        .first()
+    )
+    if stmt_import is None or stmt_import.status != "preview":
+        raise HTTPException(status_code=404, detail="Import not found or not in preview status")
+
+    # Validate notes contain at least one numeric amount
+    if not re.search(r"\d+", payload.notes):
+        raise HTTPException(status_code=400, detail="Notes must contain at least one numeric amount")
+
+    # Load transactions for this import
+    from app.models.budget_transaction import BudgetTransaction
+
+    transactions = (
+        db.query(BudgetTransaction)
+        .filter(BudgetTransaction.import_id == import_id)
+        .all()
+    )
+
+    if payload.row_index < 0 or payload.row_index >= len(transactions):
+        raise HTTPException(status_code=400, detail="Row index out of range")
+
+    tx = transactions[payload.row_index]
+
+    # Validate the row is ATM Withdrawal
+    atm_category = (
+        db.query(Category)
+        .filter(Category.user_id == user_id, Category.name == "ATM Withdrawal")
+        .first()
+    )
+    if not atm_category or tx.category_id != atm_category.id:
+        raise HTTPException(status_code=400, detail="Row is not an ATM Withdrawal transaction")
+
+    atm_amount = abs(float(tx.amount))
+
+    # Load user's categories for matching
+    categories = (
+        db.query(Category)
+        .filter(Category.user_id == user_id, Category.is_archived == False)  # noqa: E712
+        .all()
+    )
+    known_categories = [c.name for c in categories]
+    cat_by_name = {c.name.lower(): c for c in categories}
+
+    # Call LLM to parse notes
+    parsed = llm_service.parse_cash_notes(payload.notes, atm_amount, known_categories)
+    if parsed is None:
+        raise HTTPException(status_code=502, detail="Failed to parse cash notes — LLM call failed or timed out")
+
+    # Build response items and validate total
+    items: list[CashSplitItem] = []
+    total = Decimal("0")
+
+    for exp in parsed:
+        amount = Decimal(str(exp["amount"])).quantize(Decimal("0.01"))
+        total += amount
+
+        # Match category name to ID
+        cat_name = exp.get("category_name", "Other")
+        matched_cat = cat_by_name.get(cat_name.lower())
+        if not matched_cat:
+            # Fall back to "Other"
+            matched_cat = cat_by_name.get("other")
+
+        items.append(CashSplitItem(
+            description=exp["description"],
+            amount=amount,
+            category_id=matched_cat.id if matched_cat else None,
+            category_name=matched_cat.name if matched_cat else "Other",
+        ))
+
+    original_amount = abs(tx.amount)
+    if total > original_amount:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Split total ({total}) exceeds ATM withdrawal amount ({original_amount})",
+        )
+
+    remainder = (original_amount - total).quantize(Decimal("0.01"))
+
+    return SplitAtmResponse(items=items, remainder=remainder)
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +413,10 @@ def confirm_import(
         raise HTTPException(status_code=404, detail="Import not found")
 
     category_overrides = payload.category_overrides if payload else None
-    return import_service.confirm_import(db, stmt_import, category_overrides=category_overrides)
+    splits = None
+    if payload and payload.splits:
+        splits = [s.model_dump() for s in payload.splits]
+    return import_service.confirm_import(db, stmt_import, category_overrides=category_overrides, splits=splits)
 
 
 # ---------------------------------------------------------------------------
@@ -429,3 +550,36 @@ def delete_bank_profile(
 
     db.delete(profile)
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Debug – reset all budget data
+# ---------------------------------------------------------------------------
+
+
+@router.post("/budget/debug/reset", status_code=status.HTTP_200_OK)
+def debug_reset(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Delete all transactions, rules, categories, and imports for the user. Clears mappings file."""
+    from app.services.mapping_file_service import save_bulk_mappings
+
+    tx = db.query(BudgetTransaction).filter(BudgetTransaction.user_id == user_id).delete()
+    rules = db.query(AutoCatRule).filter(
+        AutoCatRule.category_id.in_(
+            db.query(Category.id).filter(Category.user_id == user_id)
+        )
+    ).delete(synchronize_session="fetch")
+    imps = db.query(StatementImport).filter(StatementImport.user_id == user_id).delete()
+    cats = db.query(Category).filter(Category.user_id == user_id).delete()
+    db.commit()
+
+    save_bulk_mappings({})
+
+    return {
+        "transactions_deleted": tx,
+        "rules_deleted": rules,
+        "categories_deleted": cats,
+        "imports_deleted": imps,
+    }
