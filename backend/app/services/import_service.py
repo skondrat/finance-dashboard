@@ -335,6 +335,41 @@ def confirm_import(
         if mappings:
             mappings_updated = save_bulk_mappings(mappings)
 
+    # Auto-create Income Sources from positive (income) transactions
+    income_created = 0
+    transfers_cat = (
+        db.query(Category)
+        .filter(
+            Category.user_id == import_record.user_id,
+            Category.name == "Transfers",
+        )
+        .first()
+    )
+    transfers_cat_id = transfers_cat.id if transfers_cat else None
+
+    for tx in transactions:
+        if tx.amount <= 0:
+            continue
+        # Skip self-transfers
+        desc_lower = (tx.description or "").lower().strip()
+        if "transfer between" in desc_lower:
+            continue
+        if transfers_cat_id and tx.category_id == transfers_cat_id:
+            continue
+
+        from app.models.income_source import IncomeSource
+
+        income = IncomeSource(
+            user_id=import_record.user_id,
+            label=tx.description,
+            amount=tx.amount,
+            currency=tx.currency,
+            month=tx.date.month,
+            year=tx.date.year,
+        )
+        db.add(income)
+        income_created += 1
+
     import_record.status = "confirmed"
     db.commit()
     db.refresh(import_record)
@@ -344,6 +379,7 @@ def confirm_import(
         "status": "confirmed",
         "row_count": import_record.row_count,
         "mappings_updated": mappings_updated,
+        "income_created": income_created,
     }
 
 
