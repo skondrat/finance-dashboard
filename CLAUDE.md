@@ -19,6 +19,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-29
 - TypeScript 5 (frontend only) + Next.js 16, TanStack Query, Zustand (013-budget-ui-improvements)
 - N/A (no backend changes) (013-budget-ui-improvements)
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query (frontend) (014-add-spend-default-categories)
+- Python 3.11 (backend only) + FastAPI, SQLAlchemy 2.0 (015-auto-income-from-statement)
+- SQLite via SQLAlchemy (no schema changes — reuses IncomeSource model) (015-auto-income-from-statement)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -38,9 +40,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 015-auto-income-from-statement: Added Python 3.11 (backend only) + FastAPI, SQLAlchemy 2.0
 - 014-add-spend-default-categories: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query (frontend)
 - 013-budget-ui-improvements: Added TypeScript 5 (frontend only) + Next.js 16, TanStack Query, Zustand
-- 012-llm-model-selector: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, anthropic SDK (backend); Next.js 16, TanStack Query, Zustand (frontend)
 
 
 <!-- MANUAL ADDITIONS START -->
