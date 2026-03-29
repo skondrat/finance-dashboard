@@ -477,6 +477,39 @@ export function useCreateCategory() {
   });
 }
 
+export function useUpdateCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { id: string; name: string; color: string; monthly_budget: number | null },
+    Error,
+    { id: string; monthly_budget?: number | null }
+  >({
+    mutationFn: ({ id, ...data }) =>
+      apiFetch(`/budget/categories/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
+    },
+  });
+}
+
+export function useDeleteCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: (id) =>
+      apiFetch(`/budget/categories/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
+    },
+  });
+}
+
 export function useSeedCategoriesUpload() {
   const queryClient = useQueryClient();
 

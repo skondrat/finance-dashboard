@@ -9,6 +9,8 @@ import {
   useImportCategories,
   useSeedCategoriesUpload,
   useCreateCategory,
+  useUpdateCategory,
+  useDeleteCategory,
   useSplitAtmCash,
   type ImportResponse,
   type ImportRow,
@@ -326,6 +328,75 @@ function PreviewTable({
   );
 }
 
+function InitCategoryBudgetCell({
+  category,
+}: {
+  category: ImportCategory;
+}) {
+  const updateMutation = useUpdateCategory();
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+
+  function startEdit() {
+    setEditValue(
+      category.monthly_budget != null
+        ? String(Number(category.monthly_budget))
+        : ""
+    );
+    setEditing(true);
+  }
+
+  function confirmEdit() {
+    setEditing(false);
+    const trimmed = editValue.trim();
+    const newBudget = trimmed === "" ? null : parseFloat(trimmed);
+
+    if (newBudget !== null && (isNaN(newBudget) || newBudget < 0)) return;
+
+    const current = category.monthly_budget != null ? Number(category.monthly_budget) : null;
+    if (newBudget === current) return;
+
+    updateMutation.mutate({ id: category.id, monthly_budget: newBudget });
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        autoFocus
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+        onBlur={confirmEdit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") confirmEdit();
+          if (e.key === "Escape") cancelEdit();
+        }}
+        className="w-20 rounded border border-on-surface-variant/30 bg-surface-container-lowest px-1.5 py-0.5 text-right font-mono text-xs text-on-surface focus:outline-none"
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={startEdit}
+      className={cn(
+        "cursor-pointer rounded px-1.5 py-0.5 font-mono text-xs transition-colors hover:bg-surface-container-low",
+        updateMutation.isPending && "animate-pulse opacity-50"
+      )}
+    >
+      {category.monthly_budget != null
+        ? `\u20AC${Number(category.monthly_budget).toFixed(2)}`
+        : "\u2014"}
+    </span>
+  );
+}
+
 function InitCategories({
   categories,
   onComplete,
@@ -335,6 +406,7 @@ function InitCategories({
 }) {
   const seedMutation = useSeedCategoriesUpload();
   const createMutation = useCreateCategory();
+  const deleteMutation = useDeleteCategory();
   const [newName, setNewName] = useState("");
   const [newBudget, setNewBudget] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
@@ -421,21 +493,33 @@ function InitCategories({
                 <th className="pb-2 text-right font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant">
                   Budget
                 </th>
+                <th className="w-8 pb-2" />
               </tr>
             </thead>
             <tbody>
               {categories.map((cat) => (
                 <tr
                   key={cat.id}
-                  className="border-b border-on-surface-variant/5 last:border-0"
+                  className="group border-b border-on-surface-variant/5 last:border-0"
                 >
                   <td className="py-1.5 font-body text-sm text-on-surface">
                     {cat.name}
                   </td>
-                  <td className="py-1.5 text-right font-mono text-xs text-on-surface-variant">
-                    {cat.monthly_budget != null
-                      ? `\u20AC${Number(cat.monthly_budget).toFixed(2)}`
-                      : "\u2014"}
+                  <td className="py-1.5 text-right text-on-surface-variant">
+                    <InitCategoryBudgetCell category={cat} />
+                  </td>
+                  <td className="py-1.5 text-center">
+                    <button
+                      onClick={() => deleteMutation.mutate(cat.id)}
+                      disabled={deleteMutation.isPending}
+                      className="invisible rounded p-0.5 text-on-surface-variant/40 transition-colors hover:text-on-error-container group-hover:visible disabled:opacity-50"
+                      title={`Remove ${cat.name}`}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -461,7 +545,7 @@ function InitCategories({
         </div>
         <div className="w-28">
           <label className="font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant">
-            Budget (\u20AC)
+            Budget (€)
           </label>
           <input
             type="number"
