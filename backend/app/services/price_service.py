@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import and_
@@ -205,6 +205,83 @@ def get_latest_price(db: Session, asset_id: str) -> AssetPrice | None:
     )
 
 
+def seed_historical_prices(db: Session, user_id: str) -> int:
+    """Fetch historical prices for all held assets if not already present.
+
+    Only fetches if an asset has fewer than 5 price rows (i.e., no history).
+    Returns the number of assets for which history was seeded.
+    """
+    from sqlalchemy import func as sa_func
+
+    held_asset_ids = (
+        db.query(InvestmentTransaction.asset_id)
+        .join(Account, InvestmentTransaction.account_id == Account.id)
+        .filter(Account.user_id == user_id)
+        .distinct()
+        .all()
+    )
+    held_asset_ids = [row[0] for row in held_asset_ids]
+    if not held_asset_ids:
+        return 0
+
+    assets = db.query(Asset).filter(Asset.id.in_(held_asset_ids)).all()
+    today = date.today()
+    from_date = today - timedelta(days=365)
+    now = datetime.utcnow()
+    seeded = 0
+
+    for asset in assets:
+        # Check if we already have sufficient history
+        count = (
+            db.query(sa_func.count(AssetPrice.id))
+            .filter(AssetPrice.asset_id == asset.id)
+            .scalar()
+        )
+        if count >= 5:
+            continue
+
+        provider = get_provider(asset.asset_type)
+        try:
+            history = provider.fetch_historical(asset.ticker, from_date, today)
+        except Exception:
+            logger.exception("Failed to fetch historical prices for %s", asset.ticker)
+            continue
+
+        if not history:
+            continue
+
+        source = "coingecko" if asset.asset_type == "crypto" else "yfinance"
+        price_currency = "EUR" if source == "coingecko" else "USD"
+
+        for entry in history:
+            existing = (
+                db.query(AssetPrice)
+                .filter(
+                    and_(
+                        AssetPrice.asset_id == asset.id,
+                        AssetPrice.date == entry["date"],
+                    )
+                )
+                .first()
+            )
+            if not existing:
+                db.add(
+                    AssetPrice(
+                        asset_id=asset.id,
+                        date=entry["date"],
+                        close_price=entry["close_price"],
+                        source=source,
+                        currency=price_currency,
+                        fetched_at=now,
+                    )
+                )
+
+        seeded += 1
+
+    db.commit()
+    return seeded
+
+
 def refresh_prices(db: Session, user_id: str) -> int:
     """Fetch the latest price for every asset the user currently holds.
 
@@ -274,4 +351,8 @@ def refresh_prices(db: Session, user_id: str) -> int:
         refreshed += 1
 
     db.commit()
+
+    # Seed historical prices if missing (first refresh populates history)
+    seed_historical_prices(db, user_id)
+
     return refreshed

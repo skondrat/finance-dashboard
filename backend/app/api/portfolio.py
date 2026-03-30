@@ -124,3 +124,17 @@ def get_performance_breakdown(
     return portfolio_service.get_performance_breakdown(
         db, user_id, currency=currency
     )
+
+
+# ---------------------------------------------------------------------------
+# All Transactions (028)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/portfolio/transactions")
+def get_all_transactions(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Return all investment transactions across all accounts."""
+    return portfolio_service.get_all_transactions(db, user_id)
