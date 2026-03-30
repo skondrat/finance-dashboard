@@ -125,7 +125,7 @@ export default function PortfolioPage() {
                       {acct.name}
                     </p>
                     <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant">
-                      {acct.type.replace("_", " ")}
+                      {acct.type.replace("_", " ")} · {acct.currency || "USD"}
                     </p>
                   </div>
                   <button

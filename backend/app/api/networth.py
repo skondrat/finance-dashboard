@@ -250,6 +250,10 @@ def get_networth_history(
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
+    from decimal import Decimal
+    from app.services import fx_service
+
+    # Get all snapshots (prefer matching currency, fall back to any)
     snapshots = (
         db.query(NetworthSnapshot)
         .filter(
@@ -259,4 +263,23 @@ def get_networth_history(
         .order_by(NetworthSnapshot.snapshot_month.asc())
         .all()
     )
+
+    # If no snapshots in requested currency, convert from whatever currency is available
+    if not snapshots:
+        all_snapshots = (
+            db.query(NetworthSnapshot)
+            .filter(NetworthSnapshot.user_id == user_id)
+            .order_by(NetworthSnapshot.snapshot_month.asc())
+            .all()
+        )
+        for snap in all_snapshots:
+            if snap.currency != currency:
+                rate = fx_service.get_rate(db, base=snap.currency, target=currency)
+                if rate is None:
+                    row = fx_service.fetch_daily_rate(db, base=snap.currency, target=currency)
+                    rate = row.rate if row else Decimal("1")
+                snap.total_networth = snap.total_networth * rate
+                snap.currency = currency
+        snapshots = all_snapshots
+
     return NetworthHistoryResponse(snapshots=snapshots)

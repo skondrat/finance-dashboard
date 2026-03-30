@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useTransactions, type Transaction } from "@/lib/queries/accounts";
+import { useTransactions, useUpdateTransaction, useDeleteTransaction, type Transaction, type UpdateTransactionPayload } from "@/lib/queries/accounts";
 import { useAllTransactions, type PortfolioTransaction } from "@/lib/queries/portfolio";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
@@ -47,6 +47,11 @@ export function TransactionsView({ accountId }: TransactionsViewProps) {
   const currency = useCurrencyStore((s) => s.currency);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<UpdateTransactionPayload>({});
+  const updateTxn = useUpdateTransaction(accountId ?? "");
+  const deleteTxn = useDeleteTransaction(accountId ?? "");
 
   // Normalize both transaction types to a common shape
   const normalizedTxs = useMemo(() => {
@@ -141,47 +146,129 @@ export function TransactionsView({ accountId }: TransactionsViewProps) {
 
               {/* Transaction rows */}
               <div className="space-y-2">
-                {txs.map((tx) => (
-                  <div
-                    key={tx.id}
-                    className="flex items-center gap-4 rounded-xl bg-surface-container-lowest px-4 py-3 transition-colors hover:bg-surface-container-low"
-                  >
-                    {/* Date */}
-                    <span className="shrink-0 font-mono text-xs text-on-surface-variant w-16">
-                      {formatDate(tx.date)}
-                    </span>
+                {txs.map((tx) => {
+                  const txAccountId = "account_id" in tx ? (tx as PortfolioTransaction).account_id : accountId;
 
-                    {/* Asset initial circle */}
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-container-high">
-                      <span className="font-mono text-sm font-medium text-on-surface">
-                        {getInitial(tx.asset.ticker)}
-                      </span>
-                    </div>
+                  if (editingId === tx.id) {
+                    return (
+                      <div key={tx.id} className="rounded-xl bg-surface-container-lowest px-4 py-3 space-y-3">
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <input type="number" step="any" placeholder="Quantity" defaultValue={tx.quantity}
+                            onChange={(e) => setEditForm((f) => ({ ...f, quantity: parseFloat(e.target.value) }))}
+                            className="rounded-md bg-surface-container-highest px-2 py-1.5 font-mono text-sm text-on-surface" />
+                          <input type="number" step="any" placeholder="Price" defaultValue={tx.price_per_unit}
+                            onChange={(e) => setEditForm((f) => ({ ...f, price_per_unit: parseFloat(e.target.value) }))}
+                            className="rounded-md bg-surface-container-highest px-2 py-1.5 font-mono text-sm text-on-surface" />
+                          <input type="number" step="any" placeholder="Fees" defaultValue={tx.fees}
+                            onChange={(e) => setEditForm((f) => ({ ...f, fees: parseFloat(e.target.value) }))}
+                            className="rounded-md bg-surface-container-highest px-2 py-1.5 font-mono text-sm text-on-surface" />
+                          <input type="date" defaultValue={tx.date}
+                            onChange={(e) => setEditForm((f) => ({ ...f, date: e.target.value }))}
+                            className="rounded-md bg-surface-container-highest px-2 py-1.5 font-mono text-sm text-on-surface" />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              if (txAccountId) {
+                                updateTxn.mutate({ txnId: tx.id, payload: editForm }, {
+                                  onSuccess: () => { setEditingId(null); setEditForm({}); }
+                                });
+                              }
+                            }}
+                            disabled={updateTxn.isPending}
+                            className="rounded-lg bg-primary px-3 py-1.5 font-mono text-xs text-on-primary"
+                          >
+                            {updateTxn.isPending ? "Saving…" : "Save"}
+                          </button>
+                          <button onClick={() => { setEditingId(null); setEditForm({}); }}
+                            className="rounded-lg px-3 py-1.5 font-mono text-xs text-on-surface-variant hover:text-on-surface"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
 
-                    {/* Description */}
-                    <div className="min-w-0 flex-1">
-                      <p className="font-body text-sm text-on-surface truncate">
-                        {tx.type === "buy" ? "Bought" : "Sold"} {tx.asset.ticker} x{parseFloat(String(tx.quantity))} @ {formatCurrency(tx.price_per_unit, tx.currency)}
-                      </p>
-                      <p className="font-mono text-xs text-on-surface-variant">
-                        {tx.type}{tx.fees > 0 ? ` · fees ${formatCurrency(tx.fees, tx.currency)}` : ""}{tx.account_name ? ` · ${tx.account_name}` : ""}
-                      </p>
-                    </div>
-
-                    {/* Amount */}
-                    <span
-                      className={cn(
-                        "shrink-0 font-mono text-sm font-medium",
-                        tx.type === "buy"
-                          ? "text-on-error-container"
-                          : "text-on-tertiary-container"
-                      )}
+                  return (
+                    <div
+                      key={tx.id}
+                      className="flex items-center gap-4 rounded-xl bg-surface-container-lowest px-4 py-3 transition-colors hover:bg-surface-container-low"
                     >
-                      {tx.type === "buy" ? "-" : "+"}
-                      {formatCurrency(tx.quantity * tx.price_per_unit, currency)}
-                    </span>
-                  </div>
-                ))}
+                      {/* Date */}
+                      <span className="shrink-0 font-mono text-xs text-on-surface-variant w-16">
+                        {formatDate(tx.date)}
+                      </span>
+
+                      {/* Asset initial circle */}
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-container-high">
+                        <span className="font-mono text-sm font-medium text-on-surface">
+                          {getInitial(tx.asset.ticker)}
+                        </span>
+                      </div>
+
+                      {/* Description */}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-body text-sm text-on-surface truncate">
+                          {tx.type === "buy" ? "Bought" : "Sold"} {tx.asset.ticker} x{parseFloat(String(tx.quantity))} @ {formatCurrency(tx.price_per_unit, tx.currency)}
+                        </p>
+                        <p className="font-mono text-xs text-on-surface-variant">
+                          {tx.type}{tx.fees > 0 ? ` · fees ${formatCurrency(tx.fees, tx.currency)}` : ""}{tx.account_name ? ` · ${tx.account_name}` : ""}
+                        </p>
+                      </div>
+
+                      {/* Amount */}
+                      <span
+                        className={cn(
+                          "shrink-0 font-mono text-sm font-medium",
+                          tx.type === "buy"
+                            ? "text-on-error-container"
+                            : "text-on-tertiary-container"
+                        )}
+                      >
+                        {tx.type === "buy" ? "-" : "+"}
+                        {formatCurrency(tx.quantity * tx.price_per_unit, currency)}
+                      </span>
+
+                      {/* 3-dot menu */}
+                      {txAccountId && (
+                        <div className="relative shrink-0">
+                          <button
+                            onClick={() => setMenuOpenId(menuOpenId === tx.id ? null : tx.id)}
+                            className="rounded-md p-1 text-on-surface-variant transition-colors hover:text-on-surface hover:bg-surface-container-high"
+                          >
+                            ⋮
+                          </button>
+                          {menuOpenId === tx.id && (
+                            <div className="absolute right-0 top-8 z-10 rounded-lg bg-surface-container-high shadow-lg py-1 min-w-[100px]">
+                              <button
+                                onClick={() => {
+                                  setEditingId(tx.id);
+                                  setEditForm({});
+                                  setMenuOpenId(null);
+                                }}
+                                className="w-full px-4 py-2 text-left font-body text-sm text-on-surface hover:bg-surface-container-highest"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setMenuOpenId(null);
+                                  if (confirm(`Delete this ${tx.type} transaction for ${tx.asset.ticker}?`)) {
+                                    deleteTxn.mutate(tx.id);
+                                  }
+                                }}
+                                className="w-full px-4 py-2 text-left font-body text-sm text-on-error-container hover:bg-surface-container-highest"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
