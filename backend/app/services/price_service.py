@@ -226,8 +226,16 @@ def seed_historical_prices(db: Session, user_id: str) -> int:
 
     assets = db.query(Asset).filter(Asset.id.in_(held_asset_ids)).all()
     today = date.today()
-    from_date = today - timedelta(days=365)
     now = datetime.utcnow()
+
+    # Use earliest transaction date as start (not just 365 days)
+    earliest_tx_date = (
+        db.query(sa_func.min(InvestmentTransaction.date))
+        .join(Account, InvestmentTransaction.account_id == Account.id)
+        .filter(Account.user_id == user_id)
+        .scalar()
+    )
+    from_date = earliest_tx_date if earliest_tx_date else today - timedelta(days=365)
     seeded = 0
 
     for asset in assets:

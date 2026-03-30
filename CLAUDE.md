@@ -38,6 +38,7 @@ Auto-generated from all feature plans. Last updated: 2026-03-30
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query, Zustand (frontend) (027-fix-currency-conversion)
 - SQLite via SQLAlchemy (new `currency` column on `asset_prices`, existing `exchange_rates` table) (027-fix-currency-conversion)
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, React 19, Recharts 3, TanStack Query (frontend) (028-portfolio-ui-polish)
+- Python 3.11 (backend), TypeScript 5 (frontend) + Recharts 3 (frontend chart), yfinance/pycoingecko (historical prices) (029-fix-performance-chart)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -57,9 +58,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 029-fix-performance-chart: Added Python 3.11 (backend), TypeScript 5 (frontend) + Recharts 3 (frontend chart), yfinance/pycoingecko (historical prices)
 - 028-portfolio-ui-polish: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, React 19, Recharts 3, TanStack Query (frontend)
 - 027-fix-currency-conversion: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query, Zustand (frontend)
-- 026-add-current-price-column: Added TypeScript 5 (frontend only) + Next.js 16, React 19
 
 
 <!-- MANUAL ADDITIONS START -->

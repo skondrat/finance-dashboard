@@ -378,6 +378,9 @@ def get_performance(
     sorted_holding_dates = sorted(holdings_by_date.keys())
     snap_idx = 0
 
+    # Carry-forward: track last known price per asset across days
+    last_known_prices: dict[str, Decimal] = {}
+
     for d in price_dates:
         # Advance the holdings snapshot to this date
         while snap_idx < len(sorted_holding_dates) and sorted_holding_dates[snap_idx] <= d:
@@ -388,10 +391,16 @@ def get_performance(
             continue
 
         # Compute portfolio value for this date (converted to display currency)
+        # Use carry-forward: if no price today, use last known price
         day_prices = price_lookup.get(d, {})
         day_value = _ZERO
         for asset_id, qty in last_snapshot.items():
             p = day_prices.get(asset_id)
+            if p is not None:
+                last_known_prices[asset_id] = p
+            else:
+                p = last_known_prices.get(asset_id)
+
             if p is not None:
                 p_ccy = price_currency_map.get(asset_id, currency)
                 rate = _get_fx_rate(db, p_ccy, currency)

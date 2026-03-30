@@ -77,8 +77,8 @@ export function PerformanceChart() {
             <AreaChart data={data}>
               <defs>
                 <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#000000" stopOpacity={0.08} />
-                  <stop offset="100%" stopColor="#000000" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#4ade80" stopOpacity={0.15} />
+                  <stop offset="100%" stopColor="#4ade80" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis
@@ -86,8 +86,10 @@ export function PerformanceChart() {
                 tickFormatter={(v) => formatDate(v)}
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 12, fontFamily: "var(--font-mono)" }}
+                tick={{ fontSize: 11, fontFamily: "var(--font-mono)" }}
                 className="text-on-surface-variant"
+                interval="preserveStartEnd"
+                minTickGap={60}
               />
               <YAxis
                 tickFormatter={(v) => formatCurrency(v, currency)}
@@ -104,7 +106,7 @@ export function PerformanceChart() {
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="#000000"
+                stroke="#4ade80"
                 strokeWidth={1.5}
                 fill="url(#areaGradient)"
               />
