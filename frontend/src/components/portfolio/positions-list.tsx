@@ -15,6 +15,7 @@ import {
 type SortColumn =
   | "asset"
   | "buy_in"
+  | "current"
   | "value"
   | "pl"
   | "weight";
@@ -23,6 +24,7 @@ type SortDirection = "asc" | "desc";
 const COLUMNS: { key: SortColumn; label: string; align?: "right" }[] = [
   { key: "asset", label: "Asset" },
   { key: "buy_in", label: "Buy In", align: "right" },
+  { key: "current", label: "Current", align: "right" },
   { key: "value", label: "Position", align: "right" },
   { key: "pl", label: "P/L", align: "right" },
   { key: "weight", label: "Weight", align: "right" },
@@ -41,6 +43,9 @@ function sortPositions(
         break;
       case "buy_in":
         cmp = a.avg_cost_basis - b.avg_cost_basis;
+        break;
+      case "current":
+        cmp = a.current_price - b.current_price;
         break;
       case "value":
         cmp = a.current_value - b.current_value;
@@ -138,7 +143,7 @@ export function PositionsList({
       )}
 
       {/* Header */}
-      <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 px-4 pb-2">
+      <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] gap-4 px-4 pb-2">
         {COLUMNS.map((col) => (
           <button
             key={col.key}
@@ -166,7 +171,7 @@ export function PositionsList({
           {sorted.map((position) => (
             <div
               key={position.asset.id}
-              className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 items-center rounded-xl bg-surface-container-lowest px-4 py-3 transition-colors hover:bg-surface-container-low"
+              className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] gap-4 items-center rounded-xl bg-surface-container-lowest px-4 py-3 transition-colors hover:bg-surface-container-low"
             >
               {/* Asset */}
               <div>
@@ -181,6 +186,13 @@ export function PositionsList({
               {/* Buy In */}
               <p className="text-right font-mono text-sm text-on-surface">
                 {formatCurrency(position.avg_cost_basis, currency)}
+              </p>
+
+              {/* Current Price */}
+              <p className="text-right font-mono text-sm text-on-surface">
+                {position.current_price > 0
+                  ? formatCurrency(position.current_price, currency)
+                  : "—"}
               </p>
 
               {/* Position (value + qty) */}
