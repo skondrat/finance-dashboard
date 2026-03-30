@@ -46,9 +46,24 @@ export default function PortfolioPage() {
         <button
           onClick={() => refreshPrices.mutate()}
           disabled={refreshPrices.isPending}
-          className="mt-1 shrink-0 rounded-xl bg-primary px-4 py-2 font-body text-sm font-medium text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-50"
+          className="mt-2 shrink-0 rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface disabled:opacity-50"
+          title="Refresh Prices"
         >
-          {refreshPrices.isPending ? "Refreshing…" : "Refresh Prices"}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={refreshPrices.isPending ? "animate-spin" : ""}
+          >
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+          </svg>
         </button>
       </div>
 
@@ -56,9 +71,7 @@ export default function PortfolioPage() {
       <div className="col-span-12 space-y-6 lg:col-span-8">
         <PerformanceChart />
         <PositionsList onAccountChange={setSelectedAccountId} />
-        {selectedAccountId && (
-          <TransactionsView accountId={selectedAccountId} />
-        )}
+        <TransactionsView accountId={selectedAccountId} />
       </div>
 
       {/* Metadata rail — 4 columns */}

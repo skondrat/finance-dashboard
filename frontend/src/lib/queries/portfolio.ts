@@ -83,6 +83,26 @@ export function useRefreshPrices() {
   });
 }
 
+export interface PortfolioTransaction {
+  id: string;
+  account_id: string;
+  account_name: string;
+  asset: { id: string; ticker: string; name: string };
+  type: string;
+  quantity: number;
+  price_per_unit: number;
+  currency: string;
+  fees: number;
+  date: string;
+}
+
+export function useAllTransactions() {
+  return useQuery<PortfolioTransaction[]>({
+    queryKey: ["portfolio", "transactions"],
+    queryFn: () => apiFetch<PortfolioTransaction[]>("/portfolio/transactions"),
+  });
+}
+
 export function usePerformanceChart(range: string) {
   const currency = useCurrencyStore((s) => s.currency);
 

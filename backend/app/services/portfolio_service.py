@@ -719,3 +719,54 @@ def get_performance_breakdown(
         "twr": twr,
         "currency": currency,
     }
+
+
+# ---------------------------------------------------------------------------
+# All Transactions (028)
+# ---------------------------------------------------------------------------
+
+
+def get_all_transactions(
+    db: Session,
+    user_id: str,
+) -> list[dict]:
+    """Return all investment transactions across all accounts for the user."""
+
+    txns = (
+        db.query(InvestmentTransaction)
+        .join(Account, InvestmentTransaction.account_id == Account.id)
+        .filter(Account.user_id == user_id)
+        .order_by(InvestmentTransaction.date.desc(), InvestmentTransaction.created_at.desc())
+        .all()
+    )
+
+    # Build account name lookup
+    account_ids = list({tx.account_id for tx in txns})
+    accounts = {a.id: a for a in db.query(Account).filter(Account.id.in_(account_ids)).all()}
+
+    # Build asset lookup
+    asset_ids = list({tx.asset_id for tx in txns})
+    assets = {a.id: a for a in db.query(Asset).filter(Asset.id.in_(asset_ids)).all()}
+
+    results = []
+    for tx in txns:
+        account = accounts.get(tx.account_id)
+        asset = assets.get(tx.asset_id)
+        results.append({
+            "id": tx.id,
+            "account_id": tx.account_id,
+            "account_name": account.name if account else "Unknown",
+            "asset": {
+                "id": asset.id if asset else tx.asset_id,
+                "ticker": asset.ticker if asset else "?",
+                "name": asset.name if asset else "?",
+            },
+            "type": tx.type,
+            "quantity": tx.quantity,
+            "price_per_unit": tx.price_per_unit,
+            "currency": tx.currency,
+            "fees": tx.fees,
+            "date": tx.date,
+        })
+
+    return results
