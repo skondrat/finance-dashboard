@@ -38,9 +38,9 @@ function ChartTooltip({ active, payload, label, currency }: CustomTooltipProps) 
   );
 }
 
-export function PerformanceChart() {
+export function PerformanceChart({ accountId }: { accountId?: string } = {}) {
   const [range, setRange] = useState<Range>("1Y");
-  const { data, isLoading } = usePerformanceChart(range);
+  const { data, isLoading } = usePerformanceChart(range, accountId);
   const currency = useCurrencyStore((s) => s.currency);
 
   return (

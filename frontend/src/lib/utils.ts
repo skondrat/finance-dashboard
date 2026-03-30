@@ -35,8 +35,8 @@ export function formatDate(date: string | Date): string {
 
 export function valueColorClass(value: number | string): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
-  if (num > 0) return "text-on-tertiary-container bg-tertiary-fixed";
-  if (num < 0) return "text-on-error-container bg-error-container";
+  if (num > 0) return "text-on-tertiary-container";
+  if (num < 0) return "text-on-error-container";
   return "text-on-surface-variant";
 }
 

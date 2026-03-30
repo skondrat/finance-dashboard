@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { usePositions, type Position } from "@/lib/queries/portfolio";
-import { useAccounts } from "@/lib/queries/accounts";
 import { useCurrencyStore } from "@/stores/currency-store";
 import {
   cn,
@@ -76,23 +75,14 @@ function PositionsSkeleton() {
 }
 
 export function PositionsList({
-  onAccountChange,
+  accountId,
 }: {
-  onAccountChange?: (accountId: string | undefined) => void;
+  accountId?: string;
 } = {}) {
-  const [selectedAccountId, setSelectedAccountId] = useState<
-    string | undefined
-  >(undefined);
-  const { data: accounts } = useAccounts();
-  const { data, isLoading } = usePositions(selectedAccountId);
+  const { data, isLoading } = usePositions(accountId);
   const currency = useCurrencyStore((s) => s.currency);
   const [sortColumn, setSortColumn] = useState<SortColumn>("value");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-
-  function handleAccountChange(accountId: string | undefined) {
-    setSelectedAccountId(accountId);
-    onAccountChange?.(accountId);
-  }
 
   function handleSort(column: SortColumn) {
     if (sortColumn === column) {
@@ -110,37 +100,6 @@ export function PositionsList({
       <h2 className="font-display text-xl font-medium text-on-surface mb-4">
         Positions
       </h2>
-
-      {/* Account filter tabs */}
-      {accounts && accounts.length > 0 && (
-        <div className="flex items-center gap-4 mb-4 overflow-x-auto">
-          <button
-            onClick={() => handleAccountChange(undefined)}
-            className={cn(
-              "shrink-0 pb-1 font-mono text-xs uppercase tracking-[0.1em] transition-colors",
-              selectedAccountId === undefined
-                ? "text-on-surface border-b-2 border-on-surface"
-                : "text-on-surface-variant hover:text-on-surface"
-            )}
-          >
-            Aggregated
-          </button>
-          {accounts.map((account) => (
-            <button
-              key={account.id}
-              onClick={() => handleAccountChange(account.id)}
-              className={cn(
-                "shrink-0 pb-1 font-mono text-xs uppercase tracking-[0.1em] transition-colors",
-                selectedAccountId === account.id
-                  ? "text-on-surface border-b-2 border-on-surface"
-                  : "text-on-surface-variant hover:text-on-surface"
-              )}
-            >
-              {account.name}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Header */}
       <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] gap-4 px-4 pb-2">

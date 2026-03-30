@@ -37,13 +37,18 @@ export interface PerformancePoint {
   value: number;
 }
 
-export function usePortfolioSummary() {
+export function usePortfolioSummary(accountId?: string) {
   const currency = useCurrencyStore((s) => s.currency);
 
   return useQuery<PortfolioSummary>({
-    queryKey: ["portfolio", "summary", currency],
-    queryFn: () =>
-      apiFetch<PortfolioSummary>("/portfolio/summary", { currency }),
+    queryKey: ["portfolio", "summary", currency, accountId],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (currency) params.set("currency", currency);
+      if (accountId) params.set("account_id", accountId);
+      const qs = params.toString();
+      return apiFetch<PortfolioSummary>(`/portfolio/summary${qs ? `?${qs}` : ""}`);
+    },
   });
 }
 
@@ -103,14 +108,15 @@ export function useAllTransactions() {
   });
 }
 
-export function usePerformanceChart(range: string) {
+export function usePerformanceChart(range: string, accountId?: string) {
   const currency = useCurrencyStore((s) => s.currency);
 
   return useQuery<PerformancePoint[]>({
-    queryKey: ["portfolio", "performance", range, currency],
+    queryKey: ["portfolio", "performance", range, currency, accountId],
     queryFn: async () => {
       const params = new URLSearchParams({ range });
       if (currency) params.set("currency", currency);
+      if (accountId) params.set("account_id", accountId);
       const res = await apiFetch<PerformanceResponse>(
         `/portfolio/performance?${params.toString()}`
       );
