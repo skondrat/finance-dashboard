@@ -264,11 +264,12 @@ def get_positions(
 def get_summary(
     db: Session,
     user_id: str,
+    account_id: str | None = None,
     currency: str = "EUR",
 ) -> dict:
     """Calculate portfolio-level KPIs."""
 
-    positions = get_positions(db, user_id, currency=currency)
+    positions = get_positions(db, user_id, account_id=account_id, currency=currency)
 
     net_worth = sum((p["current_value"] for p in positions), _ZERO)
     invested_capital = sum((p["total_cost"] for p in positions), _ZERO)
@@ -306,6 +307,7 @@ def get_performance(
     db: Session,
     user_id: str,
     range_str: str = "1Y",
+    account_id: str | None = None,
     currency: str = "EUR",
 ) -> dict:
     """Generate a time series of portfolio value over time.
@@ -318,13 +320,14 @@ def get_performance(
     today = date.today()
 
     # 1. Get all user transactions up to today, ordered by date
-    txns = (
+    q = (
         db.query(InvestmentTransaction)
         .join(Account, InvestmentTransaction.account_id == Account.id)
         .filter(Account.user_id == user_id)
-        .order_by(InvestmentTransaction.date, InvestmentTransaction.created_at)
-        .all()
     )
+    if account_id is not None:
+        q = q.filter(InvestmentTransaction.account_id == account_id)
+    txns = q.order_by(InvestmentTransaction.date, InvestmentTransaction.created_at).all()
 
     if not txns:
         return {"range": range_str, "data_points": []}
@@ -435,6 +438,7 @@ def get_allocation(
     db: Session,
     user_id: str,
     group_by: str = "type",
+    account_id: str | None = None,
     currency: str = "EUR",
 ) -> dict:
     """Group current positions by an asset attribute and return allocation
@@ -443,7 +447,7 @@ def get_allocation(
     if group_by not in _VALID_GROUP_BY:
         group_by = "type"
 
-    positions = get_positions(db, user_id, currency=currency)
+    positions = get_positions(db, user_id, account_id=account_id, currency=currency)
     if not positions:
         return {"group_by": group_by, "total": _ZERO, "segments": []}
 
@@ -652,11 +656,12 @@ def calculate_twr(
 def get_performance_breakdown(
     db: Session,
     user_id: str,
+    account_id: str | None = None,
     currency: str = "EUR",
 ) -> dict:
     """Compute a detailed performance breakdown including IRR and TWR."""
 
-    positions = get_positions(db, user_id, currency=currency)
+    positions = get_positions(db, user_id, account_id=account_id, currency=currency)
 
     capital = sum((p["total_cost"] for p in positions), _ZERO)
     net_worth = sum((p["current_value"] for p in positions), _ZERO)
@@ -676,12 +681,14 @@ def get_performance_breakdown(
     realized_losses_pct = _ZERO
 
     # Transaction costs: sum of all fees (converted to display currency)
-    txns = (
+    txn_q = (
         db.query(InvestmentTransaction)
         .join(Account, InvestmentTransaction.account_id == Account.id)
         .filter(Account.user_id == user_id)
-        .all()
     )
+    if account_id is not None:
+        txn_q = txn_q.filter(InvestmentTransaction.account_id == account_id)
+    txns = txn_q.all()
     transaction_costs = _ZERO
     for tx in txns:
         fee_rate = _get_fx_rate(db, tx.currency, currency)

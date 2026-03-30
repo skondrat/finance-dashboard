@@ -43,8 +43,8 @@ function KpiCard({ label, value, large, colorClass }: KpiCardProps) {
   );
 }
 
-export function KpiStrip() {
-  const { data, isLoading } = usePortfolioSummary();
+export function KpiStrip({ accountId }: { accountId?: string } = {}) {
+  const { data, isLoading } = usePortfolioSummary(accountId);
   const currency = useCurrencyStore((s) => s.currency);
 
   if (isLoading || !data) {

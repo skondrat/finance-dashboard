@@ -44,12 +44,13 @@ def get_positions(
 
 @router.get("/portfolio/summary", response_model=PortfolioSummaryResponse)
 def get_summary(
+    account_id: str | None = Query(None),
     currency: str = Query("EUR"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
     """Return portfolio-level KPIs."""
-    return portfolio_service.get_summary(db, user_id, currency=currency)
+    return portfolio_service.get_summary(db, user_id, account_id=account_id, currency=currency)
 
 
 # ---------------------------------------------------------------------------
@@ -60,13 +61,14 @@ def get_summary(
 @router.get("/portfolio/performance", response_model=PerformanceResponse)
 def get_performance(
     range: str = Query("1Y", alias="range"),
+    account_id: str | None = Query(None),
     currency: str = Query("EUR"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
     """Return a historical performance time-series."""
     return portfolio_service.get_performance(
-        db, user_id, range_str=range, currency=currency
+        db, user_id, range_str=range, account_id=account_id, currency=currency
     )
 
 
@@ -96,13 +98,14 @@ def refresh_prices(
 @router.get("/portfolio/allocation", response_model=AllocationResponse)
 def get_allocation(
     group_by: str = Query("type"),
+    account_id: str | None = Query(None),
     currency: str = Query("EUR"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
     """Return portfolio allocation breakdown by the given grouping."""
     return portfolio_service.get_allocation(
-        db, user_id, group_by=group_by, currency=currency
+        db, user_id, group_by=group_by, account_id=account_id, currency=currency
     )
 
 
@@ -116,13 +119,14 @@ def get_allocation(
     response_model=PerformanceBreakdownResponse,
 )
 def get_performance_breakdown(
+    account_id: str | None = Query(None),
     currency: str = Query("EUR"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
     """Return detailed performance breakdown with IRR and TWR."""
     return portfolio_service.get_performance_breakdown(
-        db, user_id, currency=currency
+        db, user_id, account_id=account_id, currency=currency
     )
 
 

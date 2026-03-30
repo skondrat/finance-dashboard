@@ -10,6 +10,7 @@ import { AllocationDonut } from "@/components/portfolio/allocation-donut";
 import { PerformanceBreakdown } from "@/components/portfolio/performance-breakdown";
 import { useAccounts, useDeleteAccount } from "@/lib/queries/accounts";
 import { useRefreshPrices, usePortfolioSummary } from "@/lib/queries/portfolio";
+import { cn } from "@/lib/utils";
 
 export default function PortfolioPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<
@@ -18,7 +19,7 @@ export default function PortfolioPage() {
   const { data: accounts } = useAccounts();
   const deleteAccount = useDeleteAccount();
   const refreshPrices = useRefreshPrices();
-  const { data: summary } = usePortfolioSummary();
+  const { data: summary } = usePortfolioSummary(selectedAccountId);
   const autoRefreshDone = useRef(false);
 
   useEffect(() => {
@@ -38,10 +39,41 @@ export default function PortfolioPage() {
 
   return (
     <div className="grid grid-cols-12 gap-6">
+      {/* Account selector — full width, top */}
+      {accounts && accounts.length > 0 && (
+        <div className="col-span-12 flex items-center gap-4 overflow-x-auto">
+          <button
+            onClick={() => setSelectedAccountId(undefined)}
+            className={cn(
+              "shrink-0 pb-1 font-mono text-xs uppercase tracking-[0.1em] transition-colors",
+              selectedAccountId === undefined
+                ? "text-on-surface border-b-2 border-on-surface"
+                : "text-on-surface-variant hover:text-on-surface"
+            )}
+          >
+            Aggregated
+          </button>
+          {accounts.map((account) => (
+            <button
+              key={account.id}
+              onClick={() => setSelectedAccountId(account.id)}
+              className={cn(
+                "shrink-0 pb-1 font-mono text-xs uppercase tracking-[0.1em] transition-colors",
+                selectedAccountId === account.id
+                  ? "text-on-surface border-b-2 border-on-surface"
+                  : "text-on-surface-variant hover:text-on-surface"
+              )}
+            >
+              {account.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* KPI strip — full width */}
       <div className="col-span-12 flex items-start justify-between gap-4">
         <div className="flex-1">
-          <KpiStrip />
+          <KpiStrip accountId={selectedAccountId} />
         </div>
         <button
           onClick={() => refreshPrices.mutate()}
@@ -69,8 +101,8 @@ export default function PortfolioPage() {
 
       {/* Main content — 8 columns */}
       <div className="col-span-12 space-y-6 lg:col-span-8">
-        <PerformanceChart />
-        <PositionsList onAccountChange={setSelectedAccountId} />
+        <PerformanceChart accountId={selectedAccountId} />
+        <PositionsList accountId={selectedAccountId} />
         <TransactionsView accountId={selectedAccountId} />
       </div>
 
