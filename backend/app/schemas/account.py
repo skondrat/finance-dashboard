@@ -11,12 +11,14 @@ from app.schemas.portfolio import AssetResponse
 class AccountCreate(BaseModel):
     name: str
     type: str
+    currency: str = "USD"
     notes: Optional[str] = None
 
 
 class AccountUpdate(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
+    currency: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -26,6 +28,7 @@ class AccountResponse(BaseModel):
     id: str
     name: str
     type: str
+    currency: str = "USD"
     notes: Optional[str] = None
 
 

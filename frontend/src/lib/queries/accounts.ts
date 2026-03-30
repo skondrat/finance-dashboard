@@ -89,6 +89,47 @@ export function useDeleteAccount() {
   });
 }
 
+export interface UpdateTransactionPayload {
+  asset_ticker?: string;
+  type?: string;
+  quantity?: number;
+  price_per_unit?: number;
+  currency?: string;
+  fees?: number;
+  date?: string;
+}
+
+export function useUpdateTransaction(accountId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation<Transaction, Error, { txnId: string; payload: UpdateTransactionPayload }>({
+    mutationFn: ({ txnId, payload }) =>
+      apiFetch<Transaction>(`/accounts/${accountId}/transactions/${txnId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+    },
+  });
+}
+
+export function useDeleteTransaction(accountId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: (txnId) =>
+      apiFetch<void>(`/accounts/${accountId}/transactions/${txnId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+    },
+  });
+}
+
 export function useCreateTransaction(accountId: string) {
   const queryClient = useQueryClient();
 
