@@ -18,7 +18,8 @@ class AssetPrice(Base):
     asset_id: Mapped[str] = mapped_column(String(36), ForeignKey("assets.id", ondelete="CASCADE"), nullable=False, index=True)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     close_price: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
-    source: Mapped[str] = mapped_column(String(20), nullable=False)  # finnhub, coingecko, manual
+    source: Mapped[str] = mapped_column(String(20), nullable=False)  # yfinance, coingecko, manual
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")  # ISO 4217
     fetched_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     asset = relationship("Asset", back_populates="prices")

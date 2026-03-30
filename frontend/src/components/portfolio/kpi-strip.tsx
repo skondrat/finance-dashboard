@@ -66,7 +66,7 @@ export function KpiStrip() {
       />
       <KpiCard
         label="Total Return"
-        value={signedValue(data.total_return)}
+        value={signedValue(data.total_return, currency)}
         colorClass={valueColorClass(data.total_return)}
       />
       <KpiCard

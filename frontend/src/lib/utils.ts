@@ -40,7 +40,7 @@ export function valueColorClass(value: number | string): string {
   return "text-on-surface-variant";
 }
 
-export function signedValue(value: number | string): string {
+export function signedValue(value: number | string, currency: string = "EUR"): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
-  return num > 0 ? `+${formatCurrency(num)}` : formatCurrency(num);
+  return num > 0 ? `+${formatCurrency(num, currency)}` : formatCurrency(num, currency);
 }

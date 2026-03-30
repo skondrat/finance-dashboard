@@ -15,6 +15,7 @@ from app.models.account import Account
 from app.models.asset import Asset
 from app.models.asset_price import AssetPrice
 from app.models.investment_transaction import InvestmentTransaction
+from app.services import fx_service
 
 from datetime import datetime
 
@@ -24,13 +25,45 @@ from datetime import datetime
 # ---------------------------------------------------------------------------
 
 _ZERO = Decimal("0")
+_ONE = Decimal("1")
 _HUNDRED = Decimal("100")
 _QUANT_8 = Decimal("0.00000001")
 _QUANT_2 = Decimal("0.01")
 
 
-def _latest_prices_map(db: Session, asset_ids: list[str]) -> dict[str, Decimal]:
-    """Return a mapping of asset_id → latest close_price for the given IDs."""
+def _get_fx_rate(
+    db: Session,
+    from_currency: str,
+    to_currency: str,
+) -> Decimal:
+    """Return the exchange rate from *from_currency* to *to_currency*.
+
+    Falls back to 1.0 if currencies match or no rate is available.
+    Ensures a rate is fetched/cached for today if not already present.
+    """
+    if from_currency == to_currency:
+        return _ONE
+
+    # Try to fetch (caches automatically)
+    row = fx_service.fetch_daily_rate(db, base=from_currency, target=to_currency)
+    if row is not None:
+        return row.rate
+
+    # Fallback: try cached historical rate
+    rate = fx_service.get_rate(db, base=from_currency, target=to_currency)
+    if rate is not None:
+        return rate
+
+    # Try inverse
+    inverse_rate = fx_service.get_rate(db, base=to_currency, target=from_currency)
+    if inverse_rate is not None and inverse_rate > _ZERO:
+        return (_ONE / inverse_rate).quantize(_QUANT_8, rounding=ROUND_HALF_UP)
+
+    return _ONE  # ultimate fallback
+
+
+def _latest_prices_map(db: Session, asset_ids: list[str]) -> dict[str, tuple[Decimal, str]]:
+    """Return a mapping of asset_id → (latest close_price, currency) for the given IDs."""
     if not asset_ids:
         return {}
 
@@ -46,7 +79,7 @@ def _latest_prices_map(db: Session, asset_ids: list[str]) -> dict[str, Decimal]:
     )
 
     rows = (
-        db.query(AssetPrice.asset_id, AssetPrice.close_price)
+        db.query(AssetPrice.asset_id, AssetPrice.close_price, AssetPrice.currency)
         .join(
             latest_date_sq,
             and_(
@@ -56,7 +89,7 @@ def _latest_prices_map(db: Session, asset_ids: list[str]) -> dict[str, Decimal]:
         )
         .all()
     )
-    return {r.asset_id: r.close_price for r in rows}
+    return {r.asset_id: (r.close_price, r.currency) for r in rows}
 
 
 def _date_range_start(range_str: str) -> date:
@@ -146,18 +179,30 @@ def get_positions(
     if not positions:
         return []
 
-    # Fetch latest prices
+    # Fetch latest prices (now returns (price, price_currency) tuples)
     asset_ids = list({p["asset_id"] for p in positions.values()})
     price_map = _latest_prices_map(db, asset_ids)
 
     # Fetch asset objects for response
     asset_objs = {a.id: a for a in db.query(Asset).filter(Asset.id.in_(asset_ids)).all()}
 
+    # Pre-compute FX rates for each native currency → display currency
+    fx_cache: dict[str, Decimal] = {}
+
+    def _fx(from_ccy: str) -> Decimal:
+        if from_ccy not in fx_cache:
+            fx_cache[from_ccy] = _get_fx_rate(db, from_ccy, currency)
+        return fx_cache[from_ccy]
+
     # Compute total portfolio value for weight calculation
     total_value = _ZERO
     results: list[dict] = []
     for pos in positions.values():
-        current_price = price_map.get(pos["asset_id"], _ZERO)
+        price_entry = price_map.get(pos["asset_id"])
+        raw_price = price_entry[0] if price_entry else _ZERO
+        price_ccy = price_entry[1] if price_entry else currency
+        rate = _fx(price_ccy)
+        current_price = (raw_price * rate).quantize(_QUANT_8, rounding=ROUND_HALF_UP)
         current_value = (pos["quantity"] * current_price).quantize(_QUANT_2, rounding=ROUND_HALF_UP)
         total_value += current_value
 
@@ -166,12 +211,25 @@ def get_positions(
         if asset is None:
             continue
 
-        current_price = price_map.get(pos["asset_id"], _ZERO)
+        # Convert current price from its native currency to display currency
+        price_entry = price_map.get(pos["asset_id"])
+        raw_price = price_entry[0] if price_entry else _ZERO
+        price_ccy = price_entry[1] if price_entry else currency
+        price_rate = _fx(price_ccy)
+        current_price = (raw_price * price_rate).quantize(_QUANT_8, rounding=ROUND_HALF_UP)
         current_value = (pos["quantity"] * current_price).quantize(_QUANT_2, rounding=ROUND_HALF_UP)
-        pnl_absolute = current_value - pos["total_cost"]
+
+        # Convert cost basis from transaction currency to display currency
+        # Cost basis is tracked in the transaction's original currency
+        # For simplicity, use the asset's trading currency as the cost basis currency
+        cost_rate = _fx(asset.currency)
+        avg_cost_display = (pos["avg_cost_basis"] * cost_rate).quantize(_QUANT_8, rounding=ROUND_HALF_UP)
+        total_cost_display = (pos["total_cost"] * cost_rate).quantize(_QUANT_2, rounding=ROUND_HALF_UP)
+
+        pnl_absolute = current_value - total_cost_display
         pnl_percent = (
-            ((pnl_absolute / pos["total_cost"]) * _HUNDRED).quantize(_QUANT_2, rounding=ROUND_HALF_UP)
-            if pos["total_cost"] > _ZERO
+            ((pnl_absolute / total_cost_display) * _HUNDRED).quantize(_QUANT_2, rounding=ROUND_HALF_UP)
+            if total_cost_display > _ZERO
             else _ZERO
         )
         weight = (
@@ -189,8 +247,8 @@ def get_positions(
                     "asset_type": asset.asset_type,
                 },
                 "quantity": pos["quantity"],
-                "avg_cost_basis": pos["avg_cost_basis"],
-                "total_cost": pos["total_cost"],
+                "avg_cost_basis": avg_cost_display,
+                "total_cost": total_cost_display,
                 "current_price": current_price,
                 "current_value": current_value,
                 "pnl_absolute": pnl_absolute,
@@ -303,9 +361,12 @@ def get_performance(
     )
 
     # Build price lookup: date → { asset_id: close_price }
+    # Also track each price's native currency for conversion
     price_lookup: dict[date, dict[str, Decimal]] = defaultdict(dict)
+    price_currency_map: dict[str, str] = {}  # asset_id → currency
     for row in prices_rows:
         price_lookup[row.date][row.asset_id] = row.close_price
+        price_currency_map[row.asset_id] = row.currency
 
     # 4. Build the time-series data points
     # Collect all unique price dates in range
@@ -326,13 +387,15 @@ def get_performance(
         if not last_snapshot:
             continue
 
-        # Compute portfolio value for this date
+        # Compute portfolio value for this date (converted to display currency)
         day_prices = price_lookup.get(d, {})
         day_value = _ZERO
         for asset_id, qty in last_snapshot.items():
             p = day_prices.get(asset_id)
             if p is not None:
-                day_value += qty * p
+                p_ccy = price_currency_map.get(asset_id, currency)
+                rate = _get_fx_rate(db, p_ccy, currency)
+                day_value += qty * p * rate
 
         data_points.append(
             {
@@ -603,14 +666,17 @@ def get_performance_breakdown(
     realized_losses = _ZERO
     realized_losses_pct = _ZERO
 
-    # Transaction costs: sum of all fees
+    # Transaction costs: sum of all fees (converted to display currency)
     txns = (
         db.query(InvestmentTransaction)
         .join(Account, InvestmentTransaction.account_id == Account.id)
         .filter(Account.user_id == user_id)
         .all()
     )
-    transaction_costs = sum((tx.fees for tx in txns), _ZERO)
+    transaction_costs = _ZERO
+    for tx in txns:
+        fee_rate = _get_fx_rate(db, tx.currency, currency)
+        transaction_costs += (tx.fees * fee_rate).quantize(_QUANT_2, rounding=ROUND_HALF_UP)
 
     total_return = price_gain + dividends + realized_losses - transaction_costs
     total_return_pct = (
@@ -619,13 +685,14 @@ def get_performance_breakdown(
         else _ZERO
     )
 
-    # IRR: build cashflows from transactions + current portfolio value
+    # IRR: build cashflows from transactions + current portfolio value (in display currency)
     cashflows: list[tuple[date, Decimal]] = []
     for tx in txns:
+        tx_rate = _get_fx_rate(db, tx.currency, currency)
         if tx.type == "buy":
-            cashflows.append((tx.date, -(tx.quantity * tx.price_per_unit + tx.fees)))
+            cashflows.append((tx.date, -(tx.quantity * tx.price_per_unit + tx.fees) * tx_rate))
         elif tx.type == "sell":
-            cashflows.append((tx.date, tx.quantity * tx.price_per_unit - tx.fees))
+            cashflows.append((tx.date, (tx.quantity * tx.price_per_unit - tx.fees) * tx_rate))
 
     # Add current portfolio value as a positive terminal cashflow
     if net_worth > _ZERO:
