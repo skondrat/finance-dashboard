@@ -1,5 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -40,6 +41,7 @@ class PortfolioSummaryResponse(BaseModel):
     investment_rate: FloatDecimal
     invested_capital: FloatDecimal
     currency: str
+    last_refreshed_at: Optional[datetime] = None
 
 
 class PerformanceDataPoint(BaseModel):

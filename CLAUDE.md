@@ -1,6 +1,6 @@
 # finance-dashboard Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-29
+Auto-generated from all feature plans. Last updated: 2026-03-30
 
 ## Active Technologies
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, pdfplumber (PDF table extraction), anthropic (Anthropic Python SDK), Next.js 16, TanStack Query, Zustand, react-dropzone (002-pdf-statement-import)
@@ -33,6 +33,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-29
 - SQLite via SQLAlchemy (new `networth_snapshots` table + Alembic migration) (022-networth-history)
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, React 19, TanStack Query, Zustand, Tailwind CSS v4 (frontend) (024-subscriptions)
 - SQLite via SQLAlchemy (new `subscriptions` + `dismissed_suggestions` tables + Alembic migration) (024-subscriptions)
+- Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, finnhub-python, pycoingecko (backend); Next.js 16, TanStack Query, Zustand (frontend) (025-fix-portfolio-prices)
+- SQLite via SQLAlchemy (existing `assets`, `asset_prices` tables) (025-fix-portfolio-prices)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -52,9 +54,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 025-fix-portfolio-prices: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, finnhub-python, pycoingecko (backend); Next.js 16, TanStack Query, Zustand (frontend)
 - 024-subscriptions: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, React 19, TanStack Query, Zustand, Tailwind CSS v4 (frontend)
 - 022-networth-history: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, React 19, Recharts 3, TanStack Query, Zustand (frontend)
-- 021-user-menu: Added TypeScript 5 (frontend only) + Next.js 16, React 19, Zustand (auth store), Tailwind CSS v4
 
 
 <!-- MANUAL ADDITIONS START -->

@@ -98,11 +98,12 @@ export function useDeleteSubscription() {
   });
 }
 
-export function useSubscriptionSuggestions() {
+export function useSubscriptionSuggestions(enabled: boolean) {
   return useQuery<{ suggestions: SubscriptionSuggestion[] }>({
     queryKey: ["subscriptions", "suggestions"],
     queryFn: () =>
       apiFetch<{ suggestions: SubscriptionSuggestion[] }>("/subscriptions/suggestions"),
+    enabled,
   });
 }
 

@@ -41,62 +41,54 @@ class PriceProvider(ABC):
 
 
 # ---------------------------------------------------------------------------
-# Finnhub provider (stocks / ETFs)
+# Yahoo Finance provider (stocks / ETFs)
 # ---------------------------------------------------------------------------
 
 
-class FinnhubProvider(PriceProvider):
-    """Fetch prices from Finnhub for stocks and ETFs."""
+class YFinanceProvider(PriceProvider):
+    """Fetch prices from Yahoo Finance for stocks and ETFs."""
 
     def __init__(self) -> None:
         try:
-            import finnhub  # type: ignore[import-untyped]
+            import yfinance  # type: ignore[import-untyped]
 
-            self._client = finnhub.Client(api_key=settings.FINNHUB_API_KEY)
+            self._yf = yfinance
         except Exception:
-            logger.warning("finnhub-python SDK not available or API key missing")
-            self._client = None
+            logger.warning("yfinance SDK not available")
+            self._yf = None
 
     # -- public interface ----------------------------------------------------
 
     def fetch_price(self, ticker: str) -> Decimal | None:
-        if self._client is None:
+        if self._yf is None:
             return None
         try:
-            quote = self._client.quote(ticker)
-            current = quote.get("c")  # current price
-            if current is not None and current > 0:
-                return Decimal(str(current))
+            t = self._yf.Ticker(ticker)
+            hist = t.history(period="5d")
+            if not hist.empty:
+                last_close = hist["Close"].iloc[-1]
+                if last_close > 0:
+                    return Decimal(str(round(last_close, 8)))
         except Exception:
-            logger.exception("Finnhub: error fetching quote for %s", ticker)
+            logger.exception("YFinance: error fetching quote for %s", ticker)
         return None
 
     def fetch_historical(
         self, ticker: str, from_date: date, to_date: date
     ) -> list[dict]:
-        if self._client is None:
+        if self._yf is None:
             return []
         try:
-            import time as _time
-
-            res = self._client.stock_candles(
-                ticker,
-                "D",
-                int(_time.mktime(from_date.timetuple())),
-                int(_time.mktime(to_date.timetuple())),
-            )
-            if res.get("s") != "ok":
-                return []
-            timestamps = res.get("t", [])
-            closes = res.get("c", [])
+            t = self._yf.Ticker(ticker)
+            hist = t.history(start=from_date.isoformat(), end=to_date.isoformat())
             results: list[dict] = []
-            for ts, c in zip(timestamps, closes):
-                d = date.fromtimestamp(ts)
-                results.append({"date": d, "close_price": Decimal(str(c))})
+            for idx, row in hist.iterrows():
+                d = idx.date() if hasattr(idx, "date") else idx
+                results.append({"date": d, "close_price": Decimal(str(round(row["Close"], 8)))})
             return results
         except Exception:
             logger.exception(
-                "Finnhub: error fetching historical for %s", ticker
+                "YFinance: error fetching historical for %s", ticker
             )
         return []
 
@@ -109,6 +101,20 @@ class FinnhubProvider(PriceProvider):
 class CoinGeckoProvider(PriceProvider):
     """Fetch prices from CoinGecko for crypto assets."""
 
+    # Ticker → CoinGecko coin ID mapping
+    _TICKER_TO_CG_ID: dict[str, str] = {
+        "btc": "bitcoin",
+        "eth": "ethereum",
+        "sol": "solana",
+        "ada": "cardano",
+        "dot": "polkadot",
+        "matic": "matic-network",
+        "link": "chainlink",
+        "avax": "avalanche-2",
+        "xrp": "ripple",
+        "doge": "dogecoin",
+    }
+
     def __init__(self) -> None:
         try:
             from pycoingecko import CoinGeckoAPI  # type: ignore[import-untyped]
@@ -118,18 +124,19 @@ class CoinGeckoProvider(PriceProvider):
             logger.warning("pycoingecko SDK not available")
             self._cg = None
 
+    def _resolve_cg_id(self, ticker: str) -> str:
+        """Map a ticker symbol to a CoinGecko coin ID."""
+        return self._TICKER_TO_CG_ID.get(ticker.lower(), ticker.lower())
+
     # -- public interface ----------------------------------------------------
 
     def fetch_price(self, ticker: str) -> Decimal | None:
         if self._cg is None:
             return None
         try:
-            # CoinGecko expects ids like "bitcoin", not "BTC".
-            # We lower-case the ticker as a simple heuristic; a real mapping
-            # table would be used in production.
-            cg_id = ticker.lower()
-            data = self._cg.get_price(ids=cg_id, vs_currencies="usd")
-            price = data.get(cg_id, {}).get("usd")
+            cg_id = self._resolve_cg_id(ticker)
+            data = self._cg.get_price(ids=cg_id, vs_currencies="eur")
+            price = data.get(cg_id, {}).get("eur")
             if price is not None:
                 return Decimal(str(price))
         except Exception:
@@ -142,10 +149,10 @@ class CoinGeckoProvider(PriceProvider):
         if self._cg is None:
             return []
         try:
-            cg_id = ticker.lower()
+            cg_id = self._resolve_cg_id(ticker)
             days = (to_date - from_date).days or 1
             data = self._cg.get_coin_market_chart_by_id(
-                id=cg_id, vs_currency="usd", days=days
+                id=cg_id, vs_currency="eur", days=days
             )
             results: list[dict] = []
             for ts_ms, price in data.get("prices", []):
@@ -164,23 +171,23 @@ class CoinGeckoProvider(PriceProvider):
 # ---------------------------------------------------------------------------
 
 # Singletons (created lazily)
-_finnhub_provider: FinnhubProvider | None = None
+_yfinance_provider: YFinanceProvider | None = None
 _coingecko_provider: CoinGeckoProvider | None = None
 
 
 def get_provider(asset_type: str) -> PriceProvider:
     """Return the appropriate PriceProvider based on asset type."""
-    global _finnhub_provider, _coingecko_provider
+    global _yfinance_provider, _coingecko_provider
 
     if asset_type == "crypto":
         if _coingecko_provider is None:
             _coingecko_provider = CoinGeckoProvider()
         return _coingecko_provider
 
-    # stock, etf, bond → Finnhub
-    if _finnhub_provider is None:
-        _finnhub_provider = FinnhubProvider()
-    return _finnhub_provider
+    # stock, etf, bond → Yahoo Finance
+    if _yfinance_provider is None:
+        _yfinance_provider = YFinanceProvider()
+    return _yfinance_provider
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +261,7 @@ def refresh_prices(db: Session, user_id: str) -> int:
                     asset_id=asset.id,
                     date=today,
                     close_price=price,
-                    source=("coingecko" if asset.asset_type == "crypto" else "finnhub"),
+                    source=("coingecko" if asset.asset_type == "crypto" else "yfinance"),
                     fetched_at=now,
                 )
             )

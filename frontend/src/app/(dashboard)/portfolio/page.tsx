@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { KpiStrip } from "@/components/portfolio/kpi-strip";
 import { PerformanceChart } from "@/components/portfolio/performance-chart";
 import { PositionsList } from "@/components/portfolio/positions-list";
@@ -9,6 +9,7 @@ import { TransactionsView } from "@/components/portfolio/transactions-view";
 import { AllocationDonut } from "@/components/portfolio/allocation-donut";
 import { PerformanceBreakdown } from "@/components/portfolio/performance-breakdown";
 import { useAccounts, useDeleteAccount } from "@/lib/queries/accounts";
+import { useRefreshPrices, usePortfolioSummary } from "@/lib/queries/portfolio";
 
 export default function PortfolioPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<
@@ -16,12 +17,39 @@ export default function PortfolioPage() {
   >(undefined);
   const { data: accounts } = useAccounts();
   const deleteAccount = useDeleteAccount();
+  const refreshPrices = useRefreshPrices();
+  const { data: summary } = usePortfolioSummary();
+  const autoRefreshDone = useRef(false);
+
+  useEffect(() => {
+    if (autoRefreshDone.current || refreshPrices.isPending) return;
+    if (!summary) return;
+
+    const lastRefresh = summary.last_refreshed_at
+      ? new Date(summary.last_refreshed_at).getTime()
+      : 0;
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+
+    if (lastRefresh < oneHourAgo) {
+      autoRefreshDone.current = true;
+      refreshPrices.mutate();
+    }
+  }, [summary, refreshPrices.isPending]);
 
   return (
     <div className="grid grid-cols-12 gap-6">
       {/* KPI strip — full width */}
-      <div className="col-span-12">
-        <KpiStrip />
+      <div className="col-span-12 flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <KpiStrip />
+        </div>
+        <button
+          onClick={() => refreshPrices.mutate()}
+          disabled={refreshPrices.isPending}
+          className="mt-1 shrink-0 rounded-xl bg-primary px-4 py-2 font-body text-sm font-medium text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-50"
+        >
+          {refreshPrices.isPending ? "Refreshing…" : "Refresh Prices"}
+        </button>
       </div>
 
       {/* Main content — 8 columns */}

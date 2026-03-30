@@ -7,14 +7,32 @@ import {
 } from "@/lib/queries/subscriptions";
 import { formatCurrency } from "@/lib/utils";
 
-export function SuggestionCards() {
-  const { data } = useSubscriptionSuggestions();
+interface Props {
+  enabled: boolean;
+}
+
+export function SuggestionCards({ enabled }: Props) {
+  const { data, isLoading } = useSubscriptionSuggestions(enabled);
   const confirmMutation = useCreateSubscription();
   const dismissMutation = useDismissSuggestion();
 
+  if (!enabled) return null;
+
+  if (isLoading) {
+    return <div className="h-20 animate-pulse rounded-2xl bg-surface-container-lowest" />;
+  }
+
   const suggestions = data?.suggestions ?? [];
 
-  if (suggestions.length === 0) return null;
+  if (suggestions.length === 0) {
+    return (
+      <div className="rounded-2xl bg-surface-container-lowest p-6">
+        <p className="font-mono text-xs text-on-surface-variant text-center">
+          No recurring expenses detected in your imported statements.
+        </p>
+      </div>
+    );
+  }
 
   function handleConfirm(description: string, amount: number, currency: string) {
     confirmMutation.mutate({
