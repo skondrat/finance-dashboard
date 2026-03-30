@@ -213,7 +213,7 @@ export function PositionsList({
                     valueColorClass(position.pnl_absolute)
                   )}
                 >
-                  {signedValue(position.pnl_absolute)}
+                  {signedValue(position.pnl_absolute, currency)}
                 </p>
                 <p
                   className={cn(

@@ -252,8 +252,12 @@ def refresh_prices(db: Session, user_id: str) -> int:
             .first()
         )
 
+        source = "coingecko" if asset.asset_type == "crypto" else "yfinance"
+        price_currency = "EUR" if source == "coingecko" else "USD"
+
         if existing:
             existing.close_price = price
+            existing.currency = price_currency
             existing.fetched_at = now
         else:
             db.add(
@@ -261,7 +265,8 @@ def refresh_prices(db: Session, user_id: str) -> int:
                     asset_id=asset.id,
                     date=today,
                     close_price=price,
-                    source=("coingecko" if asset.asset_type == "crypto" else "yfinance"),
+                    source=source,
+                    currency=price_currency,
                     fetched_at=now,
                 )
             )

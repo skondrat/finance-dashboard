@@ -1,8 +1,8 @@
 """
 FX service – currency conversion and exchange-rate caching (T079).
 
-Uses the exchangerate.host free API (no API key required) to fetch daily
-EUR/USD (and other currency pair) rates and caches them in the
+Uses the Frankfurter API (free, no API key required, ECB data) to fetch
+daily EUR/USD (and other currency pair) rates and caches them in the
 ExchangeRate table for offline / fast access.
 """
 
@@ -20,7 +20,7 @@ from app.models.exchange_rate import ExchangeRate
 
 logger = logging.getLogger(__name__)
 
-_EXCHANGERATE_HOST_BASE = "https://api.exchangerate.host"
+_FRANKFURTER_BASE = "https://api.frankfurter.dev/v1"
 
 
 # ---------------------------------------------------------------------------
@@ -124,8 +124,8 @@ def fetch_daily_rate(
     if existing is not None:
         return existing
 
-    # Fetch from API
-    url = f"{_EXCHANGERATE_HOST_BASE}/{target_date.isoformat()}"
+    # Fetch from Frankfurter API
+    url = f"{_FRANKFURTER_BASE}/{target_date.isoformat()}"
     params = {"base": base, "symbols": target}
 
     try:
@@ -135,7 +135,7 @@ def fetch_daily_rate(
             data = resp.json()
     except Exception:
         logger.exception(
-            "exchangerate.host: failed to fetch %s/%s for %s",
+            "Frankfurter: failed to fetch %s/%s for %s",
             base,
             target,
             target_date,
@@ -146,7 +146,7 @@ def fetch_daily_rate(
     rate_value = rates.get(target)
     if rate_value is None:
         logger.warning(
-            "exchangerate.host: no rate returned for %s/%s on %s",
+            "Frankfurter: no rate returned for %s/%s on %s",
             base,
             target,
             target_date,
@@ -183,13 +183,11 @@ def fetch_historical_rates(
     if from_date is None:
         from_date = to_date
 
-    # Fetch from API for the range
-    url = f"{_EXCHANGERATE_HOST_BASE}/timeseries"
+    # Fetch from Frankfurter API for the range
+    url = f"{_FRANKFURTER_BASE}/{from_date.isoformat()}..{to_date.isoformat()}"
     params = {
         "base": base,
         "symbols": target,
-        "start_date": from_date.isoformat(),
-        "end_date": to_date.isoformat(),
     }
 
     try:
@@ -199,7 +197,7 @@ def fetch_historical_rates(
             data = resp.json()
     except Exception:
         logger.exception(
-            "exchangerate.host: failed to fetch timeseries %s/%s %s–%s",
+            "Frankfurter: failed to fetch timeseries %s/%s %s–%s",
             base,
             target,
             from_date,
