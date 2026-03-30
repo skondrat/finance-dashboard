@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { useCurrencyStore } from "@/stores/currency-store";
 
@@ -9,6 +9,7 @@ export interface PortfolioSummary {
   saving_rate: number;
   investment_rate: number;
   invested_capital: number;
+  last_refreshed_at: string | null;
 }
 
 export interface PositionAsset {
@@ -64,6 +65,22 @@ export function usePositions(accountId?: string) {
 interface PerformanceResponse {
   range: string;
   data_points: PerformancePoint[];
+}
+
+export function useRefreshPrices() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ status: string; asset_count: number }>(
+        "/portfolio/refresh-prices",
+        { method: "POST" }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+    },
+  });
 }
 
 export function usePerformanceChart(range: string) {

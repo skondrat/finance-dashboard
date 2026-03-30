@@ -16,6 +16,8 @@ from app.models.asset import Asset
 from app.models.asset_price import AssetPrice
 from app.models.investment_transaction import InvestmentTransaction
 
+from datetime import datetime
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -219,6 +221,17 @@ def get_summary(
         else _ZERO
     )
 
+    # Find the most recent price fetch time for the user's assets
+    asset_ids = [p["asset"]["id"] for p in positions] if positions else []
+    last_refreshed_at: datetime | None = None
+    if asset_ids:
+        row = (
+            db.query(func.max(AssetPrice.fetched_at))
+            .filter(AssetPrice.asset_id.in_(asset_ids))
+            .scalar()
+        )
+        last_refreshed_at = row
+
     return {
         "net_worth": net_worth,
         "total_return": total_return,
@@ -227,6 +240,7 @@ def get_summary(
         "investment_rate": _ZERO,    # computed properly in Phase 5
         "invested_capital": invested_capital,
         "currency": currency,
+        "last_refreshed_at": last_refreshed_at,
     }
 
 
