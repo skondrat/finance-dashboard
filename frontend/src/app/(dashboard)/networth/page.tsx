@@ -5,15 +5,23 @@ import { NetworthChart } from "@/components/networth/networth-chart";
 import { SummaryKpi } from "@/components/networth/summary-kpi";
 import { AccountsTable } from "@/components/networth/accounts-table";
 import { AddAccountModal } from "@/components/networth/add-account-modal";
+import { ImportNetworthModal } from "@/components/networth/import-networth-modal";
+import { NetworthComposition } from "@/components/networth/networth-composition";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useNetworthSummary } from "@/lib/queries/networth";
+import { useNetworthSummary, useNetworthHistory, useDeleteManualSnapshots } from "@/lib/queries/networth";
 
 function SettingsDropdown({
   showDebts,
   onToggleDebts,
+  onImportNetworth,
+  onRemoveManual,
+  hasManualEntries,
 }: {
   showDebts: boolean;
   onToggleDebts: () => void;
+  onImportNetworth: () => void;
+  onRemoveManual: () => void;
+  hasManualEntries: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -50,7 +58,7 @@ function SettingsDropdown({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 z-50 rounded-xl bg-surface-container-lowest p-4 shadow-ambient min-w-[180px]">
+        <div className="absolute right-0 top-full mt-2 z-50 rounded-xl bg-surface-container-lowest p-4 shadow-ambient min-w-[220px] space-y-3">
           <label className="flex items-center gap-3 cursor-pointer">
             <input
               type="checkbox"
@@ -62,6 +70,27 @@ function SettingsDropdown({
               Show Debts
             </span>
           </label>
+          <hr className="border-outline-variant/20" />
+          <button
+            onClick={() => {
+              setOpen(false);
+              onImportNetworth();
+            }}
+            className="w-full text-left font-mono text-xs uppercase tracking-[0.1em] text-on-surface hover:text-primary transition-colors py-1"
+          >
+            Import previous networth
+          </button>
+          {hasManualEntries && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                onRemoveManual();
+              }}
+              className="w-full text-left font-mono text-xs uppercase tracking-[0.1em] text-on-error-container hover:text-on-error-container/80 transition-colors py-1"
+            >
+              Remove all manual NW entries
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -71,6 +100,7 @@ function SettingsDropdown({
 export default function NetworthPage() {
   const { data: summary, isLoading } = useNetworthSummary();
   const [modalOpen, setModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [showDebts, setShowDebts] = useState(false);
   const [editAccount, setEditAccount] = useState<{
     id: string;
@@ -79,6 +109,12 @@ export default function NetworthPage() {
     currency: string;
     account_type: string;
   } | null>(null);
+
+  const deleteManualMutation = useDeleteManualSnapshots();
+
+  const { data: history } = useNetworthHistory();
+  const hasManualEntries =
+    (history?.snapshots ?? []).some((s) => s.source === "manual");
 
   const hasAccounts =
     summary && summary.accounts.length > 0;
@@ -90,6 +126,13 @@ export default function NetworthPage() {
           <SettingsDropdown
             showDebts={showDebts}
             onToggleDebts={() => setShowDebts(!showDebts)}
+            onImportNetworth={() => setImportModalOpen(true)}
+            onRemoveManual={() => {
+              if (window.confirm("Are you sure you want to remove all manually imported networth entries? This cannot be undone.")) {
+                deleteManualMutation.mutate();
+              }
+            }}
+            hasManualEntries={hasManualEntries}
           />
           <button
             onClick={() => {
@@ -103,9 +146,12 @@ export default function NetworthPage() {
         </div>
       </div>
 
-      <NetworthChart />
-
       <SummaryKpi showDebts={showDebts} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+        <NetworthChart />
+        <NetworthComposition />
+      </div>
 
       {!isLoading && !hasAccounts ? (
         <EmptyState
@@ -136,6 +182,11 @@ export default function NetworthPage() {
           setEditAccount(null);
         }}
         editAccount={editAccount}
+      />
+
+      <ImportNetworthModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
       />
     </div>
   );

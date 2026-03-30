@@ -123,8 +123,8 @@ export function NetworthChart() {
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="networthGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#000000" stopOpacity={0.08} />
-                  <stop offset="100%" stopColor="#000000" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#2E7D32" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#2E7D32" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis
@@ -150,8 +150,8 @@ export function NetworthChart() {
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="#000000"
-                strokeWidth={1.5}
+                stroke="#2E7D32"
+                strokeWidth={2}
                 fill="url(#networthGradient)"
                 dot={chartData.length === 1}
               />

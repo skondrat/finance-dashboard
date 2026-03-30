@@ -13,6 +13,9 @@ from app.models.account import Account
 from app.models.networth_account import NetworthAccount
 from app.models.networth_snapshot import NetworthSnapshot
 from app.schemas.networth import (
+    DeleteManualSnapshotsResponse,
+    ManualSnapshotCreate,
+    ManualSnapshotResponse,
     NetworthAccountCreate,
     NetworthAccountResponse,
     NetworthAccountUpdate,
@@ -283,3 +286,101 @@ def get_networth_history(
         snapshots = all_snapshots
 
     return NetworthHistoryResponse(snapshots=snapshots)
+
+
+# ---------------------------------------------------------------------------
+# Composition (donut chart)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/composition")
+def get_networth_composition(
+    group_by: str = "account",
+    currency: str = "EUR",
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    return networth_service.get_composition(db, user_id, group_by=group_by, currency=currency)
+
+
+# ---------------------------------------------------------------------------
+# Manual snapshot import
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/snapshots",
+    response_model=ManualSnapshotResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_manual_snapshot(
+    payload: ManualSnapshotCreate,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    import re
+    from datetime import datetime
+
+    # Validate format
+    if not re.match(r"^\d{4}-(0[1-9]|1[0-2])$", payload.snapshot_month):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="snapshot_month must be in YYYY-MM format",
+        )
+
+    # Validate not in the future
+    current_month = datetime.utcnow().strftime("%Y-%m")
+    if payload.snapshot_month > current_month:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="snapshot_month must not be in the future",
+        )
+
+    # Check for duplicate
+    existing = (
+        db.query(NetworthSnapshot)
+        .filter(
+            NetworthSnapshot.user_id == user_id,
+            NetworthSnapshot.snapshot_month == payload.snapshot_month,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A snapshot already exists for {payload.snapshot_month}",
+        )
+
+    snapshot = NetworthSnapshot(
+        user_id=user_id,
+        snapshot_month=payload.snapshot_month,
+        total_networth=Decimal(str(payload.total_networth)),
+        currency=payload.currency,
+        source="manual",
+    )
+    db.add(snapshot)
+    db.commit()
+    db.refresh(snapshot)
+    return snapshot
+
+
+# ---------------------------------------------------------------------------
+# Delete all manual snapshots
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/snapshots/manual", response_model=DeleteManualSnapshotsResponse)
+def delete_manual_snapshots(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    count = (
+        db.query(NetworthSnapshot)
+        .filter(
+            NetworthSnapshot.user_id == user_id,
+            NetworthSnapshot.source == "manual",
+        )
+        .delete()
+    )
+    db.commit()
+    return DeleteManualSnapshotsResponse(deleted_count=count)

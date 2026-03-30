@@ -106,3 +106,90 @@ def capture_snapshot(db: Session, user_id: str, currency: str = "EUR") -> None:
         db.add(snapshot)
 
     db.commit()
+
+
+def get_composition(
+    db: Session, user_id: str, group_by: str = "account", currency: str = "EUR"
+) -> dict:
+    """Return networth composition for the donut chart.
+
+    group_by: "account" — one segment per account
+              "type"    — grouped by account_type / asset_type
+    """
+
+    segments: list[dict] = []
+
+    # --- Manual accounts ---
+    manual_accounts = (
+        db.query(NetworthAccount)
+        .filter(NetworthAccount.user_id == user_id)
+        .order_by(NetworthAccount.created_at)
+        .all()
+    )
+
+    for acct in manual_accounts:
+        if acct.currency == currency:
+            converted = acct.balance
+        else:
+            rate = fx_service.get_rate(db, base=acct.currency, target=currency)
+            converted = fx_service.convert(acct.balance, acct.currency, currency, rate) if rate else acct.balance
+        converted = converted.quantize(_QUANT_2, rounding=ROUND_HALF_UP)
+
+        if group_by == "account":
+            segments.append({"label": acct.name, "value": float(converted), "type_key": acct.account_type or "other"})
+        else:
+            type_key = (acct.account_type or "other").capitalize()
+            segments.append({"label": type_key, "value": float(converted), "type_key": type_key})
+
+    # --- Investment accounts ---
+    portfolio_accounts = (
+        db.query(Account)
+        .filter(Account.user_id == user_id)
+        .order_by(Account.created_at)
+        .all()
+    )
+
+    for pa in portfolio_accounts:
+        positions = portfolio_service.get_positions(
+            db, user_id, account_id=pa.id, currency=currency
+        )
+
+        if group_by == "account":
+            account_value = sum((Decimal(str(p["current_value"])) for p in positions), _ZERO)
+            account_value = account_value.quantize(_QUANT_2, rounding=ROUND_HALF_UP)
+            if account_value > _ZERO:
+                segments.append({"label": pa.name, "value": float(account_value), "type_key": "investment"})
+        else:
+            # Group by asset type within this account
+            for p in positions:
+                asset_type = (p["asset"].get("asset_type") or "other").upper()
+                # Normalize common names
+                type_map = {"STOCK": "Stock", "ETF": "ETF", "CRYPTO": "Crypto", "BOND": "Bond"}
+                type_label = type_map.get(asset_type, asset_type.capitalize())
+                segments.append({"label": type_label, "value": float(p["current_value"]), "type_key": type_label})
+
+    # --- Aggregate by label if group_by=type ---
+    if group_by == "type":
+        from collections import defaultdict
+        grouped: dict[str, float] = defaultdict(float)
+        for seg in segments:
+            grouped[seg["label"]] += seg["value"]
+        segments = [{"label": k, "value": v} for k, v in grouped.items()]
+
+    # Compute total and percentages
+    total = sum(s["value"] for s in segments)
+    result_segments = []
+    for s in sorted(segments, key=lambda x: x["value"], reverse=True):
+        percentage = round((s["value"] / total) * 100, 1) if total > 0 else 0
+        result_segments.append({
+            "label": s["label"],
+            "value": round(s["value"], 2),
+            "percentage": percentage,
+        })
+
+    return {
+        "group_by": group_by,
+        "total": round(total, 2),
+        "currency": currency,
+        "segments": result_segments,
+    }

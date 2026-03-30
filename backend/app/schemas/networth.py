@@ -58,9 +58,31 @@ class NetworthSnapshotResponse(BaseModel):
     snapshot_month: str
     total_networth: FloatDecimal
     currency: str
+    source: str = "auto"
     breakdown: Optional[list] = None
     updated_at: datetime
 
 
 class NetworthHistoryResponse(BaseModel):
     snapshots: list[NetworthSnapshotResponse]
+
+
+class ManualSnapshotCreate(BaseModel):
+    snapshot_month: str  # "YYYY-MM"
+    total_networth: float
+    currency: str = "EUR"
+
+
+class ManualSnapshotResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    snapshot_month: str
+    total_networth: FloatDecimal
+    currency: str
+    source: str
+    created_at: datetime
+
+
+class DeleteManualSnapshotsResponse(BaseModel):
+    deleted_count: int

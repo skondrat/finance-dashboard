@@ -41,6 +41,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-30
 - Python 3.11 (backend), TypeScript 5 (frontend) + Recharts 3 (frontend chart), yfinance/pycoingecko (historical prices) (029-fix-performance-chart)
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI (backend); Next.js 16, TanStack Query, Recharts (frontend) (030-account-filter-kpi-style)
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query (frontend) (031-txn-edit-networth-currency)
+- Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query, Recharts, Zustand (frontend) (032-networth-manual-donut)
+- SQLite via SQLAlchemy (existing `networth_snapshots` table + new `source` column) (032-networth-manual-donut)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -60,9 +62,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 032-networth-manual-donut: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query, Recharts, Zustand (frontend)
 - 031-txn-edit-networth-currency: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query (frontend)
 - 030-account-filter-kpi-style: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI (backend); Next.js 16, TanStack Query, Recharts (frontend)
-- 029-fix-performance-chart: Added Python 3.11 (backend), TypeScript 5 (frontend) + Recharts 3 (frontend chart), yfinance/pycoingecko (historical prices)
 
 
 <!-- MANUAL ADDITIONS START -->
