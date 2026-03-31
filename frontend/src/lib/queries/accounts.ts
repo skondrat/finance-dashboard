@@ -76,6 +76,29 @@ export function useCreateAccount() {
   });
 }
 
+export interface UpdateAccountPayload {
+  name?: string;
+  type?: string;
+  currency?: string;
+  notes?: string;
+}
+
+export function useUpdateAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation<Account, Error, { id: string; payload: UpdateAccountPayload }>({
+    mutationFn: ({ id, payload }) =>
+      apiFetch<Account>(`/accounts/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio-summary"] });
+    },
+  });
+}
+
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
 

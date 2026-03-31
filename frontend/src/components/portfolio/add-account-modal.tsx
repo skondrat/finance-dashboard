@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useCreateAccount } from "@/lib/queries/accounts";
+import { useState, useEffect, type FormEvent } from "react";
+import { useCreateAccount, useUpdateAccount, type Account } from "@/lib/queries/accounts";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +11,12 @@ const ACCOUNT_TYPES = [
   { value: "bank", label: "Bank" },
 ] as const;
 
-export function AddAccountModal() {
+interface AddAccountModalProps {
+  editAccount?: Account | null;
+  onClose?: () => void;
+}
+
+export function AddAccountModal({ editAccount, onClose }: AddAccountModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<string>("brokerage");
@@ -19,6 +24,20 @@ export function AddAccountModal() {
   const currency = useCurrencyStore((s) => s.currency);
 
   const createAccount = useCreateAccount();
+  const updateAccount = useUpdateAccount();
+
+  const isEdit = !!editAccount;
+  const mutation = isEdit ? updateAccount : createAccount;
+
+  // When editAccount changes, open modal and populate form
+  useEffect(() => {
+    if (editAccount) {
+      setName(editAccount.name);
+      setType(editAccount.type);
+      setNotes("");
+      setIsOpen(true);
+    }
+  }, [editAccount]);
 
   function resetForm() {
     setName("");
@@ -29,31 +48,41 @@ export function AddAccountModal() {
   function handleClose() {
     resetForm();
     createAccount.reset();
+    updateAccount.reset();
     setIsOpen(false);
+    onClose?.();
   }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
 
-    createAccount.mutate(
-      { name: name.trim(), type, currency },
-      {
-        onSuccess: () => {
-          handleClose();
+    if (isEdit) {
+      updateAccount.mutate(
+        {
+          id: editAccount!.id,
+          payload: { name: name.trim(), type, currency },
         },
-      }
-    );
+        { onSuccess: () => handleClose() }
+      );
+    } else {
+      createAccount.mutate(
+        { name: name.trim(), type, currency },
+        { onSuccess: () => handleClose() }
+      );
+    }
   }
 
   return (
     <>
-      <button
-        onClick={() => setIsOpen(true)}
-        className="rounded-xl bg-surface-container-high px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-on-surface transition-colors hover:bg-surface-container-highest"
-      >
-        Add Account
-      </button>
+      {!isEdit && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="rounded-xl bg-surface-container-high px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-on-surface transition-colors hover:bg-surface-container-highest"
+        >
+          Add Account
+        </button>
+      )}
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -66,7 +95,7 @@ export function AddAccountModal() {
           {/* Panel */}
           <div className="relative z-10 w-full max-w-md mx-4 rounded-2xl bg-surface-container-lowest p-6 shadow-ambient">
             <h2 className="font-display text-xl font-medium text-on-surface mb-6">
-              Add Account
+              {isEdit ? "Edit Account" : "Add Account"}
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -117,9 +146,9 @@ export function AddAccountModal() {
               </div>
 
               {/* Error */}
-              {createAccount.isError && (
+              {mutation.isError && (
                 <p className="font-mono text-xs text-on-error-container">
-                  {createAccount.error.message}
+                  {mutation.error.message}
                 </p>
               )}
 
@@ -128,19 +157,19 @@ export function AddAccountModal() {
                 <button
                   type="button"
                   onClick={handleClose}
-                  disabled={createAccount.isPending}
+                  disabled={mutation.isPending}
                   className="rounded-xl bg-surface-container-high px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:bg-surface-container-highest disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={createAccount.isPending || !name.trim()}
+                  disabled={mutation.isPending || !name.trim()}
                   className={cn(
                     "rounded-xl bg-primary px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-50"
                   )}
                 >
-                  {createAccount.isPending ? "Saving..." : "Save"}
+                  {mutation.isPending ? "Saving..." : "Save"}
                 </button>
               </div>
             </form>
