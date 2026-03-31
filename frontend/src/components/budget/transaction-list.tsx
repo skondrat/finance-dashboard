@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   useBudgetTransactions,
   useCategories,
+  useUpdateBudgetTransaction,
   type BudgetTransaction,
 } from "@/lib/queries/budget";
 import { useCurrencyStore } from "@/stores/currency-store";
@@ -69,6 +70,7 @@ export function TransactionList({
 }: TransactionListProps) {
   const currency = useCurrencyStore((s) => s.currency);
   const { data: categories } = useCategories();
+  const updateTransaction = useUpdateBudgetTransaction();
 
   const [page, setPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<SortColumn>("date");
@@ -217,6 +219,7 @@ export function TransactionList({
             className="rounded-lg border border-on-surface-variant/20 bg-surface-container-lowest px-3 py-2 font-body text-sm text-on-surface focus:outline-none focus:border-on-surface-variant/40 appearance-none cursor-pointer min-w-[160px]"
           >
             <option value="">All Categories</option>
+            <option value="uncategorized">Uncategorized</option>
             {categories?.map((cat) => (
               <option key={cat.id} value={cat.id}>
                 {cat.name}
@@ -317,9 +320,25 @@ export function TransactionList({
                     className="inline-block h-2 w-2 rounded-full shrink-0"
                     style={{ backgroundColor: cat.color }}
                   />
-                  <span className="font-body text-sm text-on-surface-variant truncate">
-                    {cat.name}
-                  </span>
+                  <select
+                    value={tx.category_id ?? ""}
+                    onChange={(e) => {
+                      const newCategoryId = e.target.value || null;
+                      updateTransaction.mutate({
+                        id: tx.id,
+                        category_id: newCategoryId,
+                      });
+                    }}
+                    className="flex-1 min-w-0 truncate bg-transparent font-body text-sm text-on-surface-variant cursor-pointer focus:outline-none hover:text-on-surface transition-colors pr-4"
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M5 7L1 3h8z' fill='%236B7280'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0 center', WebkitAppearance: 'none', appearance: 'none' as const }}
+                  >
+                    <option value="">Uncategorized</option>
+                    {categories?.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             );

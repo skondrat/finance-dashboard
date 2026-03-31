@@ -31,6 +31,7 @@ router = APIRouter(prefix="/api/v1", tags=["budget"])
 @router.get("/budget/transactions", response_model=list[BudgetTransactionResponse])
 def list_transactions(
     category_id: Optional[str] = None,
+    currency: Optional[str] = None,
     from_date: Optional[date_type] = Query(None, alias="from"),
     to_date: Optional[date_type] = Query(None, alias="to"),
     page: int = Query(1, ge=1),
@@ -42,8 +43,13 @@ def list_transactions(
     from app.services.budget_service import _confirmed_tx_filter
     query = db.query(BudgetTransaction).filter(BudgetTransaction.user_id == user_id, _confirmed_tx_filter())
 
+    if currency is not None:
+        query = query.filter(BudgetTransaction.currency == currency)
     if category_id is not None:
-        query = query.filter(BudgetTransaction.category_id == category_id)
+        if category_id == "uncategorized":
+            query = query.filter(BudgetTransaction.category_id.is_(None))
+        else:
+            query = query.filter(BudgetTransaction.category_id == category_id)
     if from_date is not None:
         query = query.filter(BudgetTransaction.date >= from_date)
     if to_date is not None:

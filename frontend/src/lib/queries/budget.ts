@@ -211,6 +211,25 @@ export function useBudgetTransactions(params?: {
   });
 }
 
+export function useUpdateBudgetTransaction() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    BudgetTransaction,
+    Error,
+    { id: string; category_id?: string | null; description?: string }
+  >({
+    mutationFn: ({ id, ...data }) =>
+      apiFetch(`/budget/transactions/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
+    },
+  });
+}
+
 export function useIncomes(year?: number, month?: number) {
   const currency = useCurrencyStore((s) => s.currency);
 
