@@ -24,16 +24,19 @@ router = APIRouter(prefix="/api/v1", tags=["income"])
 def list_income_sources(
     year: Optional[int] = None,
     month: Optional[int] = None,
+    currency: Optional[str] = None,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
-    """Return income sources with optional year/month filtering."""
+    """Return income sources with optional year/month/currency filtering."""
     query = db.query(IncomeSource).filter(IncomeSource.user_id == user_id)
 
     if year is not None:
         query = query.filter(IncomeSource.year == year)
     if month is not None:
         query = query.filter(IncomeSource.month == month)
+    if currency is not None:
+        query = query.filter(IncomeSource.currency == currency)
 
     return query.order_by(IncomeSource.year.desc(), IncomeSource.month.desc()).all()
 
