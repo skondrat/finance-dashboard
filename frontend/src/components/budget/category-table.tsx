@@ -77,11 +77,15 @@ function ProgressBar({
 interface CategoryRowProps {
   item: SpendByCategoryItem;
   currency: string;
+  onClick?: () => void;
 }
 
-function CategoryRow({ item, currency }: CategoryRowProps) {
+function CategoryRow({ item, currency, onClick }: CategoryRowProps) {
   return (
-    <div className="rounded-xl bg-surface-container-lowest px-4 py-3">
+    <div
+      className={cn("rounded-xl bg-surface-container-lowest px-4 py-3", onClick && "cursor-pointer hover:bg-surface-container-lowest/80 transition-colors")}
+      onClick={onClick}
+    >
       <div className="grid grid-cols-[2fr_1fr_1fr_1fr_0.5fr] gap-4 items-center">
         {/* Category name with color dot */}
         <div className="flex items-center gap-2">
@@ -182,6 +186,7 @@ interface CategoryTableProps {
   year?: number;
   fromDate?: string;
   toDate?: string;
+  onCategoryClick?: (categoryId: string) => void;
 }
 
 const COLUMNS: { key: SortColumn; label: string; align: string }[] = [
@@ -192,7 +197,7 @@ const COLUMNS: { key: SortColumn; label: string; align: string }[] = [
   { key: "pct_of_total", label: "% Total", align: "text-right" },
 ];
 
-export function CategoryTable({ period, month, year, fromDate, toDate }: CategoryTableProps) {
+export function CategoryTable({ period, month, year, fromDate, toDate, onCategoryClick }: CategoryTableProps) {
   const { data, isLoading } = useSpendByCategory(period, month, year, fromDate, toDate);
   const currency = useCurrencyStore((s) => s.currency);
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
@@ -245,7 +250,12 @@ export function CategoryTable({ period, month, year, fromDate, toDate }: Categor
       ) : (
         <div className="space-y-2">
           {sortedData.map((item) => (
-            <CategoryRow key={item.category.id} item={item} currency={currency} />
+            <CategoryRow
+              key={item.category.id}
+              item={item}
+              currency={currency}
+              onClick={onCategoryClick ? () => onCategoryClick(item.category.id) : undefined}
+            />
           ))}
         </div>
       )}

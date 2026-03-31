@@ -10,6 +10,7 @@ import { AddSpendModal } from "@/components/budget/add-spend-modal";
 import { IncomeManager } from "@/components/budget/income-manager";
 import { DebugMenu } from "@/components/budget/debug-menu";
 import { SettingsMenu } from "@/components/budget/settings-menu";
+import { TransactionList } from "@/components/budget/transaction-list";
 import { useImportCategories } from "@/lib/queries/budget";
 
 export default function BudgetPage() {
@@ -19,6 +20,7 @@ export default function BudgetPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [txCategoryFilter, setTxCategoryFilter] = useState<string | null>(null);
 
   const { data: categoriesData, isLoading: categoriesLoading } =
     useImportCategories();
@@ -30,6 +32,25 @@ export default function BudgetPage() {
     period === "monthly" || period === "yearly" ? year : undefined;
   const summaryFrom = period === "custom" ? fromDate : undefined;
   const summaryTo = period === "custom" ? toDate : undefined;
+
+  // Compute from/to dates for transaction list based on period
+  const txFrom = (() => {
+    if (period === "monthly") return `${year}-${String(month).padStart(2, "0")}-01`;
+    if (period === "yearly") return `${year}-01-01`;
+    if (period === "ytd") return `${year}-01-01`;
+    if (period === "custom") return fromDate || undefined;
+    return undefined;
+  })();
+  const txTo = (() => {
+    if (period === "monthly") {
+      const lastDay = new Date(year, month, 0).getDate();
+      return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    }
+    if (period === "yearly") return `${year}-12-31`;
+    if (period === "ytd") return new Date().toISOString().split("T")[0];
+    if (period === "custom") return toDate || undefined;
+    return undefined;
+  })();
 
   if (categoriesLoading) {
     return null;
@@ -86,6 +107,16 @@ export default function BudgetPage() {
             year={summaryYear}
             fromDate={summaryFrom}
             toDate={summaryTo}
+            onCategoryClick={(categoryId) => {
+              setTxCategoryFilter(categoryId);
+              document.getElementById("transaction-list")?.scrollIntoView({ behavior: "smooth" });
+            }}
+          />
+          <TransactionList
+            from={txFrom}
+            to={txTo}
+            filterCategoryId={txCategoryFilter}
+            onClearCategoryFilter={() => setTxCategoryFilter(null)}
           />
         </div>
 

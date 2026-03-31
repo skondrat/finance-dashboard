@@ -1,6 +1,6 @@
 # finance-dashboard Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-30
+Auto-generated from all feature plans. Last updated: 2026-03-31
 
 ## Active Technologies
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, pdfplumber (PDF table extraction), anthropic (Anthropic Python SDK), Next.js 16, TanStack Query, Zustand, react-dropzone (002-pdf-statement-import)
@@ -43,6 +43,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-30
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query (frontend) (031-txn-edit-networth-currency)
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query, Recharts, Zustand (frontend) (032-networth-manual-donut)
 - SQLite via SQLAlchemy (existing `networth_snapshots` table + new `source` column) (032-networth-manual-donut)
+- TypeScript 5 (frontend only) + Next.js 16, TanStack Query v5, Zustand, Tailwind CSS v4 (033-transaction-list-view)
+- N/A (uses existing backend API) (033-transaction-list-view)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -62,9 +64,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 033-transaction-list-view: Added TypeScript 5 (frontend only) + Next.js 16, TanStack Query v5, Zustand, Tailwind CSS v4
 - 032-networth-manual-donut: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query, Recharts, Zustand (frontend)
 - 031-txn-edit-networth-currency: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query (frontend)
-- 030-account-filter-kpi-style: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI (backend); Next.js 16, TanStack Query, Recharts (frontend)
 
 
 <!-- MANUAL ADDITIONS START -->
