@@ -336,6 +336,8 @@ def confirm_import(
             mappings_updated = save_bulk_mappings(mappings)
 
     # Auto-create Income Sources from positive (income) transactions
+    from app.models.income_source import IncomeSource
+
     income_created = 0
     transfers_cat = (
         db.query(Category)
@@ -347,6 +349,17 @@ def confirm_import(
     )
     transfers_cat_id = transfers_cat.id if transfers_cat else None
 
+    # Build set of existing income keys to avoid duplicates
+    existing_incomes = (
+        db.query(IncomeSource)
+        .filter(IncomeSource.user_id == import_record.user_id)
+        .all()
+    )
+    existing_keys = {
+        (inc.label, float(inc.amount), inc.currency, inc.month, inc.year)
+        for inc in existing_incomes
+    }
+
     for tx in transactions:
         if tx.amount <= 0:
             continue
@@ -357,7 +370,9 @@ def confirm_import(
         if transfers_cat_id and tx.category_id == transfers_cat_id:
             continue
 
-        from app.models.income_source import IncomeSource
+        income_key = (tx.description, float(tx.amount), tx.currency, tx.date.month, tx.date.year)
+        if income_key in existing_keys:
+            continue
 
         income = IncomeSource(
             user_id=import_record.user_id,
@@ -368,6 +383,7 @@ def confirm_import(
             year=tx.date.year,
         )
         db.add(income)
+        existing_keys.add(income_key)
         income_created += 1
 
     import_record.status = "confirmed"

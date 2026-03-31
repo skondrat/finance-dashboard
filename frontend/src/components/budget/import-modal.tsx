@@ -548,6 +548,8 @@ export function ImportModal() {
           setSplitNotes("");
           setSelectedFile(null);
           setSelectedSource("");
+          uploadMutation.reset();
+          sseReset();
           setIsOpen(false);
         },
       }
