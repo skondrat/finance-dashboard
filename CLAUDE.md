@@ -64,9 +64,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 037-fix-usd-import: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query (frontend)
 - 033-transaction-list-view: Added TypeScript 5 (frontend only) + Next.js 16, TanStack Query v5, Zustand, Tailwind CSS v4
 - 032-networth-manual-donut: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query, Recharts, Zustand (frontend)
-- 031-txn-edit-networth-currency: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 16, TanStack Query (frontend)
 
 
 <!-- MANUAL ADDITIONS START -->
