@@ -16,25 +16,26 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-/**
- * Generate monochromatic shades for chart segments.
- * The largest segment (index 0 after sort) gets a green accent;
- * remaining segments get descending grey shades.
- */
+const VIBRANT_PALETTE = [
+  "#3B82F6", // blue
+  "#22C55E", // green
+  "#EAB308", // yellow
+  "#A855F7", // purple
+  "#EF4444", // red
+  "#F97316", // orange
+  "#06B6D4", // cyan
+  "#EC4899", // pink
+  "#10B981", // emerald
+  "#8B5CF6", // violet
+  "#14B8A6", // teal
+  "#F59E0B", // amber
+  "#64748B", // slate
+  "#6366F1", // indigo
+  "#84CC16", // lime
+];
+
 function generateColors(count: number): string[] {
-  if (count === 0) return [];
-
-  const colors: string[] = [];
-  // First segment: green accent
-  colors.push("#2E7D32");
-
-  // Remaining: grey shades from dark to light
-  for (let i = 1; i < count; i++) {
-    const lightness = 30 + Math.round((i / count) * 50);
-    colors.push(`hsl(0 0% ${lightness}%)`);
-  }
-
-  return colors;
+  return Array.from({ length: count }, (_, i) => VIBRANT_PALETTE[i % VIBRANT_PALETTE.length]);
 }
 
 interface DonutTooltipProps {
