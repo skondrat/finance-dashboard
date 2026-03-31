@@ -7,10 +7,6 @@ import { BreakdownRow } from "@/components/cashflow/breakdown-row";
 export default function CashflowPage() {
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl font-medium text-on-surface">
-        Cashflow
-      </h1>
-
       {/* KPI strip — full width */}
       <CashflowKpiStrip />
 
