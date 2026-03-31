@@ -15,6 +15,7 @@ from app.models.budget_transaction import BudgetTransaction
 from app.models.category import Category
 from app.models.income_source import IncomeSource
 from app.models.statement_import import StatementImport
+from app.services import fx_service
 
 
 def _confirmed_tx_filter():
@@ -97,6 +98,38 @@ def _resolve_date_range(
     raise ValueError(f"Unknown period: {period}")
 
 
+def _convert_amount(
+    db: Session,
+    amount: Decimal,
+    from_currency: str,
+    to_currency: str,
+    txn_date: date,
+    _rate_cache: dict | None = None,
+) -> Decimal:
+    """Convert *amount* from *from_currency* to *to_currency*.
+
+    Uses a per-request *_rate_cache* dict to avoid repeated DB lookups for
+    the same currency pair and date.  Returns *amount* unchanged when the
+    currencies match.  Falls back to rate=1 when no rate is available.
+    """
+    if from_currency == to_currency:
+        return amount
+
+    cache_key = (from_currency, to_currency, txn_date)
+    if _rate_cache is not None and cache_key in _rate_cache:
+        rate = _rate_cache[cache_key]
+    else:
+        rate = fx_service.get_rate(db, base=from_currency, target=to_currency, target_date=txn_date)
+        if rate is None:
+            # Not cached — fetch from API and cache
+            fetched = fx_service.fetch_daily_rate(db, base=from_currency, target=to_currency, target_date=txn_date)
+            rate = fetched.rate if fetched is not None else Decimal("1")
+        if _rate_cache is not None:
+            _rate_cache[cache_key] = rate
+
+    return fx_service.convert(amount, from_currency, to_currency, rate)
+
+
 def _income_for_period(
     db: Session,
     user_id: str,
@@ -104,22 +137,28 @@ def _income_for_period(
     end: date,
     currency: str,
 ) -> Decimal:
-    """Sum IncomeSource amounts for months overlapping the date range."""
-    # Determine month/year range
+    """Sum IncomeSource amounts for months overlapping the date range,
+    converting all currencies to *currency*."""
     start_ym = start.year * 12 + start.month
     end_ym = end.year * 12 + end.month
 
     rows = (
-        db.query(func.coalesce(func.sum(IncomeSource.amount), 0))
+        db.query(IncomeSource)
         .filter(
             IncomeSource.user_id == user_id,
-            IncomeSource.currency == currency,
             (IncomeSource.year * 12 + IncomeSource.month) >= start_ym,
             (IncomeSource.year * 12 + IncomeSource.month) <= end_ym,
         )
-        .scalar()
+        .all()
     )
-    return Decimal(str(rows)) if rows else _ZERO
+
+    rate_cache: dict = {}
+    total = _ZERO
+    for inc in rows:
+        amt = Decimal(str(inc.amount))
+        txn_date = date(inc.year, inc.month, 1)
+        total += _convert_amount(db, amt, inc.currency, currency, txn_date, rate_cache)
+    return total
 
 
 def _spend_for_period(
@@ -130,10 +169,10 @@ def _spend_for_period(
     currency: str,
     category_id: str | None = None,
 ) -> Decimal:
-    """Sum of negative BudgetTransaction amounts (abs value) in the period."""
-    q = db.query(func.coalesce(func.sum(BudgetTransaction.amount), 0)).filter(
+    """Sum of negative BudgetTransaction amounts (abs value) in the period,
+    converting all currencies to *currency*."""
+    q = db.query(BudgetTransaction).filter(
         BudgetTransaction.user_id == user_id,
-        BudgetTransaction.currency == currency,
         BudgetTransaction.date >= start,
         BudgetTransaction.date < end,
         BudgetTransaction.amount < 0,
@@ -142,8 +181,12 @@ def _spend_for_period(
     if category_id is not None:
         q = q.filter(BudgetTransaction.category_id == category_id)
 
-    result = q.scalar()
-    return abs(Decimal(str(result))) if result else _ZERO
+    rate_cache: dict = {}
+    total = _ZERO
+    for tx in q.all():
+        amt = abs(Decimal(str(tx.amount)))
+        total += _convert_amount(db, amt, tx.currency, currency, tx.date, rate_cache)
+    return total
 
 
 def _investment_spend_for_period(
@@ -153,21 +196,27 @@ def _investment_spend_for_period(
     end: date,
     currency: str,
 ) -> Decimal:
-    """Sum abs value of transactions flagged as investments in the period."""
-    result = (
-        db.query(func.coalesce(func.sum(BudgetTransaction.amount), 0))
+    """Sum abs value of transactions flagged as investments in the period,
+    converting all currencies to *currency*."""
+    rows = (
+        db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
-            BudgetTransaction.currency == currency,
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.is_investment == True,  # noqa: E712
             BudgetTransaction.amount < 0,
             _confirmed_tx_filter(),
         )
-        .scalar()
+        .all()
     )
-    return abs(Decimal(str(result))) if result else _ZERO
+
+    rate_cache: dict = {}
+    total = _ZERO
+    for tx in rows:
+        amt = abs(Decimal(str(tx.amount)))
+        total += _convert_amount(db, amt, tx.currency, currency, tx.date, rate_cache)
+    return total
 
 
 # ---------------------------------------------------------------------------
@@ -318,27 +367,25 @@ def get_spend_by_category(
         .all()
     )
 
-    # Aggregate spend per category
-    spend_rows = (
-        db.query(
-            BudgetTransaction.category_id,
-            func.sum(BudgetTransaction.amount).label("total"),
-        )
+    # Aggregate spend per category, converting all currencies
+    spend_txns = (
+        db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
-            BudgetTransaction.currency == currency,
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.amount < 0,
             _confirmed_tx_filter(),
         )
-        .group_by(BudgetTransaction.category_id)
         .all()
     )
 
-    spend_map: dict[str | None, Decimal] = {
-        row.category_id: abs(Decimal(str(row.total))) for row in spend_rows
-    }
+    rate_cache: dict = {}
+    spend_map: dict[str | None, Decimal] = {}
+    for tx in spend_txns:
+        amt = abs(Decimal(str(tx.amount)))
+        converted = _convert_amount(db, amt, tx.currency, currency, tx.date, rate_cache)
+        spend_map[tx.category_id] = spend_map.get(tx.category_id, _ZERO) + converted
 
     total_spend = sum(spend_map.values(), _ZERO)
 
