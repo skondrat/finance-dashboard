@@ -26,9 +26,10 @@ function TableSkeleton() {
 interface InlineEditCellProps {
   value: number;
   accountId: string;
+  currencyCode: string;
 }
 
-function InlineEditCell({ value, accountId }: InlineEditCellProps) {
+function InlineEditCell({ value, accountId, currencyCode }: InlineEditCellProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(String(value));
   const inputRef = useRef<HTMLInputElement>(null);
@@ -81,10 +82,7 @@ function InlineEditCell({ value, accountId }: InlineEditCellProps) {
       className="font-mono text-sm text-on-surface cursor-text hover:underline decoration-dotted underline-offset-4"
       title="Click to edit"
     >
-      {value.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}
+      {formatCurrency(value, currencyCode)}
     </button>
   );
 }
@@ -130,7 +128,7 @@ export function AccountsTable({ showDebts, onEdit }: AccountsTableProps) {
     return (
       <div
         key={`${acct.source}-${acct.id}`}
-        className="grid grid-cols-[2fr_1fr_1fr_1fr_0.5fr] items-center gap-2 rounded-xl bg-surface-container-lowest px-4 py-3"
+        className="grid grid-cols-[2fr_0.8fr_0.6fr_1fr_0.8fr_0.5fr] items-center gap-2 rounded-xl bg-surface-container-lowest px-4 py-3"
       >
         {/* Name */}
         <div className="flex items-center gap-2 min-w-0">
@@ -152,10 +150,15 @@ export function AccountsTable({ showDebts, onEdit }: AccountsTableProps) {
           {isManual ? acct.account_type : "Investment"}
         </p>
 
+        {/* Currency */}
+        <p className="font-mono text-xs text-on-surface-variant uppercase">
+          {isManual ? acct.original_currency : ""}
+        </p>
+
         {/* Balance */}
         <div className="text-right">
           {isManual ? (
-            <InlineEditCell value={acct.balance} accountId={acct.id} />
+            <InlineEditCell value={acct.balance} accountId={acct.id} currencyCode={acct.original_currency} />
           ) : (
             <p className="font-mono text-sm text-on-surface">
               {formatCurrency(acct.converted_balance, currency)}
@@ -209,12 +212,15 @@ export function AccountsTable({ showDebts, onEdit }: AccountsTableProps) {
   return (
     <div className="rounded-2xl bg-surface-container-low p-6 space-y-4">
       {/* Header */}
-      <div className="grid grid-cols-[2fr_1fr_1fr_1fr_0.5fr] gap-2 px-4 pb-2">
+      <div className="grid grid-cols-[2fr_0.8fr_0.6fr_1fr_0.8fr_0.5fr] gap-2 px-4 pb-2">
         <p className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
           Account
         </p>
         <p className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
           Type
+        </p>
+        <p className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
+          Currency
         </p>
         <p className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant text-right">
           Balance

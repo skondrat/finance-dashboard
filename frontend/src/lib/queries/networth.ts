@@ -50,6 +50,7 @@ export interface NetworthSnapshot {
   snapshot_month: string;
   total_networth: number;
   currency: string;
+  source: string;
   breakdown: Array<{
     name: string;
     balance: number;
@@ -132,6 +133,94 @@ export function useDeleteNetworthAccount() {
       apiFetch<void>(`/networth/accounts/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["networth"] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Manual snapshot import
+// ---------------------------------------------------------------------------
+
+export interface CreateManualSnapshotPayload {
+  snapshot_month: string;
+  total_networth: number;
+  currency?: string;
+}
+
+export interface ManualSnapshotResponse {
+  id: string;
+  snapshot_month: string;
+  total_networth: number;
+  currency: string;
+  source: string;
+  created_at: string;
+}
+
+export function useCreateManualSnapshot() {
+  const queryClient = useQueryClient();
+
+  return useMutation<ManualSnapshotResponse, Error, CreateManualSnapshotPayload>({
+    mutationFn: (payload) =>
+      apiFetch<ManualSnapshotResponse>("/networth/snapshots", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["networth"] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Delete all manual snapshots
+// ---------------------------------------------------------------------------
+
+export interface DeleteManualSnapshotsResponse {
+  deleted_count: number;
+}
+
+export function useDeleteManualSnapshots() {
+  const queryClient = useQueryClient();
+
+  return useMutation<DeleteManualSnapshotsResponse, Error, void>({
+    mutationFn: () =>
+      apiFetch<DeleteManualSnapshotsResponse>("/networth/snapshots/manual", {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["networth"] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Networth composition (donut chart)
+// ---------------------------------------------------------------------------
+
+export interface CompositionSegment {
+  label: string;
+  value: number;
+  percentage: number;
+}
+
+export interface CompositionResponse {
+  group_by: string;
+  total: number;
+  currency: string;
+  segments: CompositionSegment[];
+}
+
+export function useNetworthComposition(groupBy: string) {
+  const currency = useCurrencyStore((s) => s.currency);
+
+  return useQuery<CompositionResponse>({
+    queryKey: ["networth", "composition", groupBy, currency],
+    queryFn: () => {
+      const params = new URLSearchParams({ group_by: groupBy });
+      if (currency) params.set("currency", currency);
+      return apiFetch<CompositionResponse>(
+        `/networth/composition?${params.toString()}`
+      );
     },
   });
 }
