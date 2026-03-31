@@ -114,6 +114,7 @@ def load_seed_categories(
     _ENSURE_CATEGORIES = [
         {"name": "Debt", "color": "#DC2626"},
         {"name": "Investments", "color": "#10B981"},
+        {"name": "Income", "color": "#14B8A6"},
     ]
     for cat_def in _ENSURE_CATEGORIES:
         exists = (
