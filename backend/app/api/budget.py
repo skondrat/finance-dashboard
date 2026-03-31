@@ -3,6 +3,7 @@ Budget transaction and summary endpoints (T065 + T067 + T068).
 """
 
 from datetime import date as date_type
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -19,6 +20,7 @@ from app.schemas.budget import (
     SpendByCategoryItem,
 )
 from app.services import budget_service
+from app.services.budget_service import _convert_amount
 
 router = APIRouter(prefix="/api/v1", tags=["budget"])
 
@@ -39,12 +41,14 @@ def list_transactions(
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
-    """Return paginated budget transactions with optional filters."""
+    """Return paginated budget transactions with optional filters.
+
+    When *currency* is provided, all amounts are converted to that currency
+    (no filtering — all transactions are returned).
+    """
     from app.services.budget_service import _confirmed_tx_filter
     query = db.query(BudgetTransaction).filter(BudgetTransaction.user_id == user_id, _confirmed_tx_filter())
 
-    if currency is not None:
-        query = query.filter(BudgetTransaction.currency == currency)
     if category_id is not None:
         if category_id == "uncategorized":
             query = query.filter(BudgetTransaction.category_id.is_(None))
@@ -57,7 +61,24 @@ def list_transactions(
 
     query = query.order_by(BudgetTransaction.date.desc())
     offset = (page - 1) * per_page
-    return query.offset(offset).limit(per_page).all()
+    rows = query.offset(offset).limit(per_page).all()
+
+    if not currency:
+        return rows
+
+    rate_cache: dict = {}
+    results = []
+    for tx in rows:
+        converted = _convert_amount(
+            db, Decimal(str(tx.amount)), tx.currency, currency, tx.date, rate_cache,
+        )
+        results.append(BudgetTransactionResponse(
+            id=tx.id, date=tx.date, description=tx.description,
+            amount=float(converted), currency=currency,
+            category_id=tx.category_id, is_investment=tx.is_investment,
+            reference=tx.reference,
+        ))
+    return results
 
 
 # ---------------------------------------------------------------------------
