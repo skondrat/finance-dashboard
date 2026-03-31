@@ -42,7 +42,7 @@ export default function PortfolioPage() {
     <div className="grid grid-cols-12 gap-6">
       {/* Account selector — full width, top */}
       {accounts && accounts.length > 0 && (
-        <div className="col-span-12 flex items-center gap-4 overflow-x-auto">
+        <div className="col-span-12 flex items-center gap-8 overflow-x-auto">
           <button
             onClick={() => setSelectedAccountId(undefined)}
             className={cn(
