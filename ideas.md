@@ -3,15 +3,15 @@
 
 ## Transaction List View
 
-* There's no way to see individual Budget transactions after import. Add a transaction list view (accessible from clicking a category row or a new tab) with date, description, amount, category. Include search/filter.
+* ~~There's no way to see individual Budget transactions after import. Add a transaction list view (accessible from clicking a category row or a new tab) with date, description, amount, category. Include search/filter.~~ (DONE - PR #32)
 
 ## Account edit in Portfolio
 
-* Accounts should be editable - names, types
+* ~~Accounts should be editable - names, types~~ (DONE - PR #33)
 
-## Add sorting for columns in Networth tab
+## ~~Add sorting for columns in Networth tab~~ (DONE - PR #34)
 
-## Make Donuts charts colors more colorful, similar to how it is in Budget Categories
+## ~~Make Donuts charts colors more colorful, similar to how it is in Budget Categories~~ (DONE - PR #35)
 
 ---
 
