@@ -8,7 +8,7 @@ import { AddAccountModal } from "@/components/portfolio/add-account-modal";
 import { TransactionsView } from "@/components/portfolio/transactions-view";
 import { AllocationDonut } from "@/components/portfolio/allocation-donut";
 import { PerformanceBreakdown } from "@/components/portfolio/performance-breakdown";
-import { useAccounts, useDeleteAccount } from "@/lib/queries/accounts";
+import { useAccounts, useDeleteAccount, type Account } from "@/lib/queries/accounts";
 import { useRefreshPrices, usePortfolioSummary } from "@/lib/queries/portfolio";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ export default function PortfolioPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<
     string | undefined
   >(undefined);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const { data: accounts } = useAccounts();
   const deleteAccount = useDeleteAccount();
   const refreshPrices = useRefreshPrices();
@@ -112,7 +113,10 @@ export default function PortfolioPage() {
           <h2 className="font-display text-xl font-medium text-on-surface mb-4">
             Accounts
           </h2>
-          <AddAccountModal />
+          <AddAccountModal
+            editAccount={editingAccount}
+            onClose={() => setEditingAccount(null)}
+          />
           {accounts && accounts.length > 0 && (
             <div className="mt-4 space-y-1">
               {accounts.map((acct) => (
@@ -128,25 +132,37 @@ export default function PortfolioPage() {
                       {acct.type.replace("_", " ")} · {acct.currency || "USD"}
                     </p>
                   </div>
-                  <button
-                    onClick={() => {
-                      if (
-                        confirm(
-                          `Delete "${acct.name}" and all its transactions?`
-                        )
-                      ) {
-                        if (selectedAccountId === acct.id) {
-                          setSelectedAccountId(undefined);
+                  <div className="flex items-center gap-1 ml-2">
+                    <button
+                      onClick={() => setEditingAccount(acct)}
+                      className="font-mono text-sm text-on-surface-variant transition-colors hover:text-on-surface"
+                      title="Edit"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Delete "${acct.name}" and all its transactions?`
+                          )
+                        ) {
+                          if (selectedAccountId === acct.id) {
+                            setSelectedAccountId(undefined);
+                          }
+                          deleteAccount.mutate(acct.id);
                         }
-                        deleteAccount.mutate(acct.id);
-                      }
-                    }}
-                    disabled={deleteAccount.isPending}
-                    className="ml-2 font-mono text-lg text-on-surface-variant transition-colors hover:text-on-error-container disabled:opacity-50"
-                    title="Delete"
-                  >
-                    &times;
-                  </button>
+                      }}
+                      disabled={deleteAccount.isPending}
+                      className="font-mono text-lg text-on-surface-variant transition-colors hover:text-on-error-container disabled:opacity-50"
+                      title="Delete"
+                    >
+                      &times;
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
