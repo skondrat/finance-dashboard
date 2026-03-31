@@ -39,9 +39,10 @@ export interface BudgetTransaction {
   date: string;
   description: string;
   amount: number;
+  currency: string;
   category_id: string | null;
-  category_name: string | null;
-  account_id: string;
+  is_investment: boolean;
+  reference: string | null;
 }
 
 export interface IncomeSource {
@@ -184,10 +185,10 @@ export function useCategories() {
 
 export function useBudgetTransactions(params?: {
   category_id?: string;
-  month?: number;
-  year?: number;
-  limit?: number;
-  offset?: number;
+  from?: string;
+  to?: string;
+  page?: number;
+  per_page?: number;
 }) {
   const currency = useCurrencyStore((s) => s.currency);
 
@@ -196,11 +197,11 @@ export function useBudgetTransactions(params?: {
     queryFn: () => {
       const qs = new URLSearchParams();
       if (params?.category_id) qs.set("category_id", params.category_id);
-      if (params?.month !== undefined) qs.set("month", String(params.month));
-      if (params?.year !== undefined) qs.set("year", String(params.year));
-      if (params?.limit !== undefined) qs.set("limit", String(params.limit));
-      if (params?.offset !== undefined)
-        qs.set("offset", String(params.offset));
+      if (params?.from) qs.set("from", params.from);
+      if (params?.to) qs.set("to", params.to);
+      if (params?.page !== undefined) qs.set("page", String(params.page));
+      if (params?.per_page !== undefined)
+        qs.set("per_page", String(params.per_page));
       if (currency) qs.set("currency", currency);
       const query = qs.toString();
       return apiFetch<BudgetTransaction[]>(
