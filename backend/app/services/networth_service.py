@@ -80,21 +80,27 @@ def capture_snapshot(db: Session, user_id: str, currency: str = "EUR") -> None:
     if not manual_accounts and not portfolio_accounts:
         return
 
-    # Upsert: find existing snapshot for this month or create new
-    existing = (
+    # Upsert: find existing auto snapshots for this month, keep one, delete duplicates
+    existing_all = (
         db.query(NetworthSnapshot)
         .filter(
             NetworthSnapshot.user_id == user_id,
             NetworthSnapshot.snapshot_month == snapshot_month,
+            NetworthSnapshot.source != "manual",
         )
-        .first()
+        .order_by(NetworthSnapshot.updated_at.desc())
+        .all()
     )
 
-    if existing:
+    if existing_all:
+        existing = existing_all[0]
         existing.total_networth = total_networth
         existing.currency = currency
         existing.breakdown = breakdown
         existing.updated_at = datetime.utcnow()
+        # Remove duplicates for the same month
+        for dup in existing_all[1:]:
+            db.delete(dup)
     else:
         snapshot = NetworthSnapshot(
             user_id=user_id,

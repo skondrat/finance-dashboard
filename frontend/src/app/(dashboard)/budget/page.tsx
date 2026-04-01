@@ -9,6 +9,7 @@ import { ImportModal } from "@/components/budget/import-modal";
 import { AddSpendModal } from "@/components/budget/add-spend-modal";
 import { IncomeManager } from "@/components/budget/income-manager";
 import { DebugMenu } from "@/components/budget/debug-menu";
+import { SpendingCharts } from "@/components/budget/spending-charts";
 import { SettingsMenu } from "@/components/budget/settings-menu";
 import { TransactionList } from "@/components/budget/transaction-list";
 import { useImportCategories } from "@/lib/queries/budget";
@@ -129,15 +130,7 @@ export default function BudgetPage() {
           </div>
           <IncomeManager year={summaryYear} month={summaryMonth} />
 
-          {/* Placeholder for budget analytics charts (Phase 8) */}
-          <div className="rounded-2xl bg-surface-container-low p-6">
-            <h2 className="font-display text-xl font-medium text-on-surface mb-4">
-              Spending Trends
-            </h2>
-            <p className="font-body text-sm text-on-surface-variant">
-              Spending trend charts coming in Phase 8.
-            </p>
-          </div>
+          <SpendingCharts period={period} month={summaryMonth} year={summaryYear} />
 
           <DebugMenu />
         </div>
