@@ -233,6 +233,9 @@ def get_networth_summary(
         else:
             sa.percentage = _ZERO
 
+    # Keep the current month's snapshot in sync with live values
+    networth_service.capture_snapshot(db, user_id, currency=currency)
+
     return NetworthSummaryResponse(
         total_networth=total_networth,
         manual_total=manual_total.quantize(_QUANT_2, rounding=ROUND_HALF_UP),
@@ -254,36 +257,34 @@ def get_networth_history(
     user_id: str = Depends(get_current_user_id),
 ):
     from decimal import Decimal
-    from app.services import fx_service
 
-    # Get all snapshots (prefer matching currency, fall back to any)
-    snapshots = (
+    # Load all snapshots regardless of stored currency
+    all_snapshots = (
         db.query(NetworthSnapshot)
-        .filter(
-            NetworthSnapshot.user_id == user_id,
-            NetworthSnapshot.currency == currency,
-        )
-        .order_by(NetworthSnapshot.snapshot_month.asc())
+        .filter(NetworthSnapshot.user_id == user_id)
+        .order_by(NetworthSnapshot.snapshot_month.asc(), NetworthSnapshot.updated_at.desc())
         .all()
     )
 
-    # If no snapshots in requested currency, convert from whatever currency is available
-    if not snapshots:
-        all_snapshots = (
-            db.query(NetworthSnapshot)
-            .filter(NetworthSnapshot.user_id == user_id)
-            .order_by(NetworthSnapshot.snapshot_month.asc())
-            .all()
-        )
-        for snap in all_snapshots:
-            if snap.currency != currency:
-                rate = fx_service.get_rate(db, base=snap.currency, target=currency)
-                if rate is None:
-                    row = fx_service.fetch_daily_rate(db, base=snap.currency, target=currency)
-                    rate = row.rate if row else Decimal("1")
-                snap.total_networth = snap.total_networth * rate
-                snap.currency = currency
-        snapshots = all_snapshots
+    # Deduplicate by month (keep the most recently updated)
+    by_month: dict[str, NetworthSnapshot] = {}
+    for snap in all_snapshots:
+        if snap.snapshot_month not in by_month:
+            by_month[snap.snapshot_month] = snap
+
+    # Convert any snapshots that aren't in the requested currency
+    snapshots = []
+    for snap in by_month.values():
+        if snap.currency != currency:
+            rate = fx_service.get_rate(db, base=snap.currency, target=currency)
+            if rate is None:
+                row = fx_service.fetch_daily_rate(db, base=snap.currency, target=currency)
+                rate = row.rate if row else Decimal("1")
+            snap.total_networth = snap.total_networth * rate
+            snap.currency = currency
+        snapshots.append(snap)
+
+    snapshots.sort(key=lambda s: s.snapshot_month)
 
     return NetworthHistoryResponse(snapshots=snapshots)
 

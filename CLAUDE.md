@@ -47,6 +47,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-31
 - N/A (uses existing backend API) (033-transaction-list-view)
 - Python 3.11 (backend) + FastAPI, SQLAlchemy 2.0, fx_service (existing) (038-budget-currency-convert)
 - SQLite via SQLAlchemy (exchange_rates, budget_transactions, income_sources tables) (038-budget-currency-convert)
+- TypeScript 5 (frontend only) + Next.js 16, Recharts 3, TanStack Query (039-budget-spending-charts)
+- N/A (reads from existing endpoints) (039-budget-spending-charts)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -66,9 +68,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 039-budget-spending-charts: Added TypeScript 5 (frontend only) + Next.js 16, Recharts 3, TanStack Query
 - 038-budget-currency-convert: Added Python 3.11 (backend) + FastAPI, SQLAlchemy 2.0, fx_service (existing)
 - 037-fix-usd-import: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query (frontend)
-- 033-transaction-list-view: Added TypeScript 5 (frontend only) + Next.js 16, TanStack Query v5, Zustand, Tailwind CSS v4
 
 
 <!-- MANUAL ADDITIONS START -->

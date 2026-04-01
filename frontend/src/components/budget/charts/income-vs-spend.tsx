@@ -13,6 +13,37 @@ import { useIncomeVsSpend } from "@/lib/queries/budget-charts";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { formatCurrency } from "@/lib/utils";
 
+const ALL_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+interface ChartDataPoint {
+  month: string;
+  income: number;
+  spend: number;
+  savings: number;
+}
+
+function padTo12Months(data: Array<{ month: string; income: number; spend: number }>): ChartDataPoint[] {
+  const byLabel = new Map<string, { income: number; spend: number }>();
+
+  for (const d of data) {
+    // API returns "YYYY-MM" — extract short month label
+    const [, mm] = d.month.split("-");
+    const idx = parseInt(mm, 10) - 1;
+    const label = ALL_MONTHS[idx] ?? d.month;
+    byLabel.set(label, { income: d.income, spend: d.spend });
+  }
+
+  return ALL_MONTHS.map((label) => {
+    const entry = byLabel.get(label);
+    const income = entry?.income ?? 0;
+    const spend = entry?.spend ?? 0;
+    return { month: label, income, spend, savings: income - spend };
+  });
+}
+
 interface CustomTooltipProps {
   active?: boolean;
   payload?: Array<{ name: string; value: number; color: string }>;
@@ -52,10 +83,12 @@ export function IncomeVsSpendChart({ months = 12 }: IncomeVsSpendChartProps) {
   const { data, isLoading } = useIncomeVsSpend(months);
   const currency = useCurrencyStore((s) => s.currency);
 
+  const chartData = data ? padTo12Months(data) : [];
+
   return (
     <div className="rounded-2xl bg-surface-container-low p-6">
       <h2 className="font-display text-xl font-medium text-on-surface mb-6">
-        Income vs Spend
+        Monthly Overview
       </h2>
 
       <div className="h-72">
@@ -63,21 +96,21 @@ export function IncomeVsSpendChart({ months = 12 }: IncomeVsSpendChartProps) {
           <div className="h-full w-full animate-pulse rounded-xl bg-surface-container-lowest" />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barGap={4}>
+            <BarChart data={chartData} barGap={2} barCategoryGap="20%">
               <XAxis
                 dataKey="month"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 12, fontFamily: "var(--font-mono)" }}
+                tick={{ fontSize: 11, fontFamily: "var(--font-mono)" }}
                 className="text-on-surface-variant"
               />
               <YAxis
                 tickFormatter={(v) => formatCurrency(v, currency)}
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 12, fontFamily: "var(--font-mono)" }}
+                tick={{ fontSize: 11, fontFamily: "var(--font-mono)" }}
                 className="text-on-surface-variant"
-                width={100}
+                width={80}
               />
               <Tooltip
                 content={<ChartTooltip currency={currency} />}
@@ -86,20 +119,29 @@ export function IncomeVsSpendChart({ months = 12 }: IncomeVsSpendChartProps) {
               <Legend
                 wrapperStyle={{
                   fontFamily: "var(--font-mono)",
-                  fontSize: 12,
+                  fontSize: 11,
                 }}
               />
               <Bar
                 dataKey="income"
-                fill="#009668"
-                radius={[4, 4, 0, 0]}
-                maxBarSize={32}
+                name="Income"
+                fill="#EAB308"
+                radius={[3, 3, 0, 0]}
+                maxBarSize={24}
               />
               <Bar
                 dataKey="spend"
-                fill="var(--on-surface)"
-                radius={[4, 4, 0, 0]}
-                maxBarSize={32}
+                name="Spendings"
+                fill="#EF4444"
+                radius={[3, 3, 0, 0]}
+                maxBarSize={24}
+              />
+              <Bar
+                dataKey="savings"
+                name="Savings"
+                fill="#3B82F6"
+                radius={[3, 3, 0, 0]}
+                maxBarSize={24}
               />
             </BarChart>
           </ResponsiveContainer>
