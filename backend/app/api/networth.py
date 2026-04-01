@@ -23,6 +23,7 @@ from app.schemas.networth import (
     NetworthSnapshotResponse,
     NetworthSummaryAccount,
     NetworthSummaryResponse,
+    SnapshotUpdate,
 )
 from app.services import fx_service, networth_service, portfolio_service
 
@@ -281,6 +282,11 @@ def get_networth_history(
                 row = fx_service.fetch_daily_rate(db, base=snap.currency, target=currency)
                 rate = row.rate if row else Decimal("1")
             snap.total_networth = snap.total_networth * rate
+            if snap.breakdown:
+                snap.breakdown = [
+                    {**entry, "balance": float(Decimal(str(entry["balance"])) * rate)}
+                    for entry in snap.breakdown
+                ]
             snap.currency = currency
         snapshots.append(snap)
 
@@ -385,3 +391,39 @@ def delete_manual_snapshots(
     )
     db.commit()
     return DeleteManualSnapshotsResponse(deleted_count=count)
+
+
+# ---------------------------------------------------------------------------
+# Update snapshot
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/snapshots/{snapshot_id}", response_model=NetworthSnapshotResponse)
+def update_snapshot(
+    snapshot_id: str,
+    payload: SnapshotUpdate,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    from datetime import datetime
+
+    snapshot = (
+        db.query(NetworthSnapshot)
+        .filter(
+            NetworthSnapshot.id == snapshot_id,
+            NetworthSnapshot.user_id == user_id,
+        )
+        .first()
+    )
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+
+    if payload.total_networth is not None:
+        snapshot.total_networth = Decimal(str(payload.total_networth))
+    if payload.breakdown is not None:
+        snapshot.breakdown = payload.breakdown
+    snapshot.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(snapshot)
+    return snapshot

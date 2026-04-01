@@ -55,12 +55,18 @@ class NetworthSummaryResponse(BaseModel):
 class NetworthSnapshotResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    id: str
     snapshot_month: str
     total_networth: FloatDecimal
     currency: str
     source: str = "auto"
     breakdown: Optional[list] = None
     updated_at: datetime
+
+
+class SnapshotUpdate(BaseModel):
+    total_networth: Optional[float] = None
+    breakdown: Optional[list] = None
 
 
 class NetworthHistoryResponse(BaseModel):

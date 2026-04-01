@@ -47,6 +47,7 @@ export interface UpdateNetworthAccountPayload {
 }
 
 export interface NetworthSnapshot {
+  id: string;
   snapshot_month: string;
   total_networth: number;
   currency: string;
@@ -186,6 +187,35 @@ export function useDeleteManualSnapshots() {
     mutationFn: () =>
       apiFetch<DeleteManualSnapshotsResponse>("/networth/snapshots/manual", {
         method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["networth"] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Update snapshot
+// ---------------------------------------------------------------------------
+
+export interface UpdateSnapshotPayload {
+  total_networth: number;
+  breakdown: Array<{
+    name: string;
+    balance: number;
+    source: string;
+    account_type: string | null;
+  }> | null;
+}
+
+export function useUpdateSnapshot() {
+  const queryClient = useQueryClient();
+
+  return useMutation<NetworthSnapshot, Error, { id: string } & UpdateSnapshotPayload>({
+    mutationFn: ({ id, ...payload }) =>
+      apiFetch<NetworthSnapshot>(`/networth/snapshots/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["networth"] });
