@@ -83,12 +83,56 @@ export function NetworthChart() {
 
   const hasData = chartData.length > 0;
 
+  const diff = useMemo(() => {
+    if (chartData.length < 2) return null;
+    const first = chartData[0].value;
+    const last = chartData[chartData.length - 1].value;
+    const amount = last - first;
+    const pct = first !== 0 ? (amount / first) * 100 : 0;
+    return { amount, pct };
+  }, [chartData]);
+
+  const yDomain = useMemo(() => {
+    if (chartData.length === 0) return [0, "auto"] as const;
+    const values = chartData.map((d) => d.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const padding = Math.max((max - min) * 0.2, max * 0.05);
+    return [Math.max(0, Math.floor(min - padding)), Math.ceil(max + padding)] as [number, number];
+  }, [chartData]);
+
   return (
     <div className="rounded-2xl bg-surface-container-low p-6">
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="font-display text-xl font-medium text-on-surface">
-          Net Worth
-        </h2>
+        <div className="flex items-center gap-4">
+          <h2 className="font-display text-xl font-medium text-on-surface">
+            Net Worth
+          </h2>
+          {diff && (
+            <div className="flex items-center gap-1.5">
+              <span
+                className={cn(
+                  "font-mono text-sm font-medium",
+                  diff.amount >= 0 ? "text-green-500" : "text-red-500"
+                )}
+              >
+                {diff.amount >= 0 ? "+" : ""}
+                {formatCurrency(diff.amount, currency)}
+              </span>
+              <span
+                className={cn(
+                  "font-mono text-xs",
+                  diff.amount >= 0
+                    ? "text-green-500/70"
+                    : "text-red-500/70"
+                )}
+              >
+                ({diff.pct >= 0 ? "+" : ""}
+                {diff.pct.toFixed(1)}%)
+              </span>
+            </div>
+          )}
+        </div>
         <div className="flex gap-1">
           {RANGES.map((r) => (
             <button
@@ -136,6 +180,7 @@ export function NetworthChart() {
                 className="text-on-surface-variant"
               />
               <YAxis
+                domain={yDomain}
                 tickFormatter={(v) => formatCurrency(v, currency)}
                 axisLine={false}
                 tickLine={false}
@@ -153,7 +198,7 @@ export function NetworthChart() {
                 stroke="#2E7D32"
                 strokeWidth={2}
                 fill="url(#networthGradient)"
-                dot={chartData.length === 1}
+                dot={{ fill: "#2E7D32", r: 5, strokeWidth: 0 }}
               />
             </AreaChart>
           </ResponsiveContainer>
