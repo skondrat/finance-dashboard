@@ -1,6 +1,6 @@
 # finance-dashboard Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-31
+Auto-generated from all feature plans. Last updated: 2026-04-01
 
 ## Active Technologies
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, pdfplumber (PDF table extraction), anthropic (Anthropic Python SDK), Next.js 16, TanStack Query, Zustand, react-dropzone (002-pdf-statement-import)
@@ -49,6 +49,7 @@ Auto-generated from all feature plans. Last updated: 2026-03-31
 - SQLite via SQLAlchemy (exchange_rates, budget_transactions, income_sources tables) (038-budget-currency-convert)
 - TypeScript 5 (frontend only) + Next.js 16, Recharts 3, TanStack Query (039-budget-spending-charts)
 - N/A (reads from existing endpoints) (039-budget-spending-charts)
+- SQLite via SQLAlchemy (existing `networth_snapshots` table) (040-edit-networth-snapshot)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -68,9 +69,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 040-edit-networth-snapshot: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query, Zustand (frontend)
 - 039-budget-spending-charts: Added TypeScript 5 (frontend only) + Next.js 16, Recharts 3, TanStack Query
 - 038-budget-currency-convert: Added Python 3.11 (backend) + FastAPI, SQLAlchemy 2.0, fx_service (existing)
-- 037-fix-usd-import: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query (frontend)
 
 
 <!-- MANUAL ADDITIONS START -->

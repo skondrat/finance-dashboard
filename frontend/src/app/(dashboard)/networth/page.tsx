@@ -6,6 +6,7 @@ import { SummaryKpi } from "@/components/networth/summary-kpi";
 import { AccountsTable } from "@/components/networth/accounts-table";
 import { AddAccountModal } from "@/components/networth/add-account-modal";
 import { ImportNetworthModal } from "@/components/networth/import-networth-modal";
+import { EditSnapshotModal } from "@/components/networth/edit-snapshot-modal";
 import { NetworthComposition } from "@/components/networth/networth-composition";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useNetworthSummary, useNetworthHistory, useDeleteManualSnapshots } from "@/lib/queries/networth";
@@ -14,12 +15,14 @@ function SettingsDropdown({
   showDebts,
   onToggleDebts,
   onImportNetworth,
+  onEditSnapshot,
   onRemoveManual,
   hasManualEntries,
 }: {
   showDebts: boolean;
   onToggleDebts: () => void;
   onImportNetworth: () => void;
+  onEditSnapshot: () => void;
   onRemoveManual: () => void;
   hasManualEntries: boolean;
 }) {
@@ -80,6 +83,15 @@ function SettingsDropdown({
           >
             Import previous networth
           </button>
+          <button
+            onClick={() => {
+              setOpen(false);
+              onEditSnapshot();
+            }}
+            className="w-full text-left font-mono text-xs uppercase tracking-[0.1em] text-on-surface hover:text-primary transition-colors py-1"
+          >
+            Modify previous networth
+          </button>
           {hasManualEntries && (
             <button
               onClick={() => {
@@ -101,6 +113,7 @@ export default function NetworthPage() {
   const { data: summary, isLoading } = useNetworthSummary();
   const [modalOpen, setModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [editSnapshotOpen, setEditSnapshotOpen] = useState(false);
   const [showDebts, setShowDebts] = useState(false);
   const [editAccount, setEditAccount] = useState<{
     id: string;
@@ -127,6 +140,7 @@ export default function NetworthPage() {
             showDebts={showDebts}
             onToggleDebts={() => setShowDebts(!showDebts)}
             onImportNetworth={() => setImportModalOpen(true)}
+            onEditSnapshot={() => setEditSnapshotOpen(true)}
             onRemoveManual={() => {
               if (window.confirm("Are you sure you want to remove all manually imported networth entries? This cannot be undone.")) {
                 deleteManualMutation.mutate();
@@ -187,6 +201,11 @@ export default function NetworthPage() {
       <ImportNetworthModal
         open={importModalOpen}
         onClose={() => setImportModalOpen(false)}
+      />
+
+      <EditSnapshotModal
+        open={editSnapshotOpen}
+        onClose={() => setEditSnapshotOpen(false)}
       />
     </div>
   );
