@@ -262,6 +262,19 @@ export function useIncomes(year?: number, month?: number) {
   });
 }
 
+export function useCopyIncomeFromPrevious() {
+  const queryClient = useQueryClient();
+  return useMutation<{ copied: number }, Error, { year: number; month: number }>({
+    mutationFn: ({ year, month }) =>
+      apiFetch(`/budget/income/copy-from-previous?target_year=${year}&target_month=${month}`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
+    },
+  });
+}
+
 export function useImportUpload() {
   const queryClient = useQueryClient();
 
