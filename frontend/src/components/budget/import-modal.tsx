@@ -164,7 +164,7 @@ function PreviewTable({
   onAmountChange: (rowIndex: number, amount: number) => void;
 }) {
   return (
-    <div className="max-h-72 overflow-y-auto">
+    <div className="max-h-96 overflow-y-auto scrollbar-visible">
       <table className="w-full">
         <thead>
           <tr className="border-b border-on-surface-variant/10">
@@ -873,6 +873,17 @@ export function ImportModal() {
                     </span>
                   )}
                 </div>
+
+                {(() => {
+                  const uncategorized = preview.rows.filter(
+                    (r, i) => !excludedRows.has(i) && !splitStates.has(i) && r.category_source === "none" && !overrides.has(i)
+                  ).length;
+                  return uncategorized > 0 ? (
+                    <p className="mb-2 font-mono text-xs text-on-error-container">
+                      {uncategorized} transaction{uncategorized !== 1 ? "s" : ""} still need manual categorization
+                    </p>
+                  ) : null;
+                })()}
 
                 <PreviewTable
                   data={preview}
