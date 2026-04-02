@@ -165,9 +165,16 @@ class SplitOverride(BaseModel):
     items: list[SplitConfirmItem]
 
 
+class AmountOverride(BaseModel):
+    row_index: int
+    amount: FloatDecimal
+
+
 class ConfirmImportRequest(BaseModel):
     category_overrides: Optional[list[dict[str, Any]]] = None
     splits: Optional[list[SplitOverride]] = None
+    excluded_rows: Optional[list[int]] = None
+    amount_overrides: Optional[list[AmountOverride]] = None
 
 
 class ImportCategoryResponse(BaseModel):

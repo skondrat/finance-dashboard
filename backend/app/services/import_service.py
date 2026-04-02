@@ -241,10 +241,13 @@ def confirm_import(
     import_record: StatementImport,
     category_overrides: list[dict] | None = None,
     splits: list[dict] | None = None,
+    excluded_rows: list[int] | None = None,
+    amount_overrides: list[dict] | None = None,
 ) -> dict:
     """Mark an import as confirmed – its transactions become permanent.
 
-    Applies any category overrides and splits, then saves mappings to the MD file.
+    Applies any category overrides, splits, exclusions, and amount overrides,
+    then saves mappings to the MD file.
     """
     if import_record.status != "preview":
         raise ValueError(f"Cannot confirm import with status '{import_record.status}'")
@@ -256,13 +259,33 @@ def confirm_import(
         .all()
     )
 
-    # Apply category overrides
+    # Apply amount overrides (before deletions, using original indices)
+    if amount_overrides:
+        for override in amount_overrides:
+            row_index = override.get("row_index")
+            new_amount = override.get("amount")
+            if row_index is not None and new_amount is not None and 0 <= row_index < len(transactions):
+                transactions[row_index].amount = Decimal(str(new_amount))
+
+    # Apply category overrides (before deletions, using original indices)
     if category_overrides:
         for override in category_overrides:
             row_index = override.get("row_index")
             new_category_id = override.get("category_id")
             if row_index is not None and 0 <= row_index < len(transactions):
                 transactions[row_index].category_id = new_category_id
+
+    # Delete excluded rows (after overrides applied, before splits)
+    if excluded_rows:
+        for row_index in sorted(excluded_rows, reverse=True):
+            if 0 <= row_index < len(transactions):
+                db.delete(transactions[row_index])
+        db.flush()
+        transactions = (
+            db.query(BudgetTransaction)
+            .filter(BudgetTransaction.import_id == import_record.id)
+            .all()
+        )
 
     # Apply ATM cash splits
     if splits:

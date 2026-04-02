@@ -78,6 +78,58 @@ function CategorySelector({
   );
 }
 
+function EditableAmount({
+  value,
+  currency,
+  isNegative,
+  onChange,
+}: {
+  value: number;
+  currency: string;
+  isNegative: boolean;
+  onChange: (amount: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  if (editing) {
+    return (
+      <input
+        type="number"
+        step="0.01"
+        className="w-24 rounded border border-on-surface-variant/30 bg-surface-container-lowest px-1.5 py-0.5 text-right font-mono text-sm text-on-surface"
+        value={draft}
+        autoFocus
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const parsed = parseFloat(draft);
+          if (!isNaN(parsed) && parsed !== 0) {
+            onChange(isNegative ? -Math.abs(parsed) : Math.abs(parsed));
+          }
+          setEditing(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") setEditing(false);
+        }}
+      />
+    );
+  }
+
+  return (
+    <span
+      className="cursor-pointer hover:underline decoration-dotted"
+      title="Click to edit amount"
+      onClick={() => {
+        setDraft(String(Math.abs(value)));
+        setEditing(true);
+      }}
+    >
+      {formatCurrency(value, currency)}
+    </span>
+  );
+}
+
 function PreviewTable({
   data,
   currency,
@@ -89,6 +141,11 @@ function PreviewTable({
   onStartSplit,
   onUndoSplit,
   splittingRowIndex,
+  excludedRows,
+  onExcludeRow,
+  onRestoreRow,
+  amountOverrides,
+  onAmountChange,
 }: {
   data: ImportResponse;
   currency: string;
@@ -100,6 +157,11 @@ function PreviewTable({
   onStartSplit: (rowIndex: number) => void;
   onUndoSplit: (rowIndex: number) => void;
   splittingRowIndex: number | null;
+  excludedRows: Set<number>;
+  onExcludeRow: (rowIndex: number) => void;
+  onRestoreRow: (rowIndex: number) => void;
+  amountOverrides: Map<number, number>;
+  onAmountChange: (rowIndex: number, amount: number) => void;
 }) {
   return (
     <div className="max-h-72 overflow-y-auto">
@@ -127,6 +189,8 @@ function PreviewTable({
             )}
             <th className="pb-2 text-left font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
               Category
+            </th>
+            <th className="pb-2 text-center font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant w-10">
             </th>
           </tr>
         </thead>
@@ -231,6 +295,7 @@ function PreviewTable({
               );
             }
 
+            const isExcluded = excludedRows.has(idx);
             const overriddenCatId = overrides.get(idx);
             const currentCatId =
               overriddenCatId !== undefined
@@ -244,13 +309,15 @@ function PreviewTable({
             const isOther = currentCatName === "Other";
             const isAtm = row.category_name === "ATM Withdrawal" && overriddenCatId === undefined;
             const isSplitting = splittingRowIndex === idx;
+            const displayAmount = amountOverrides.get(idx) ?? row.amount;
 
             return (
               <React.Fragment key={idx}>
                 <tr
                   className={cn(
                     "border-b border-on-surface-variant/5 last:border-0",
-                    isOther && "bg-on-error-container/5"
+                    isOther && "bg-on-error-container/5",
+                    isExcluded && "opacity-30 line-through"
                   )}
                 >
                   <td className="py-2 font-mono text-xs text-on-surface">
@@ -262,12 +329,21 @@ function PreviewTable({
                   <td
                     className={cn(
                       "py-2 text-right font-mono text-sm",
-                      row.amount < 0
+                      displayAmount < 0
                         ? "text-on-error-container"
                         : "text-on-tertiary-container"
                     )}
                   >
-                    {formatCurrency(row.amount, row.currency || currency)}
+                    {isExcluded ? (
+                      formatCurrency(displayAmount, row.currency || currency)
+                    ) : (
+                      <EditableAmount
+                        value={displayAmount}
+                        currency={row.currency || currency}
+                        isNegative={row.amount < 0}
+                        onChange={(amount) => onAmountChange(idx, amount)}
+                      />
+                    )}
                   </td>
                   {data.source && (
                     <>
@@ -280,39 +356,60 @@ function PreviewTable({
                     </>
                   )}
                   <td className="py-2">
-                    <div className="flex items-center gap-1">
-                      {categories.length > 0 ? (
-                        <>
-                          <CategorySelector
-                            categories={categories}
-                            selectedId={currentCatId}
-                            onChange={(id) => onOverride(idx, id)}
-                          />
-                          <CategorySourceBadge
-                            source={
-                              overriddenCatId !== undefined
-                                ? "mapping"
-                                : row.category_source
-                            }
-                          />
-                        </>
-                      ) : (
-                        <span className="font-mono text-xs text-on-surface-variant">
-                          {currentCatName ?? "\u2014"}
-                          {row.category_source !== "none" && (
-                            <CategorySourceBadge source={row.category_source} />
-                          )}
-                        </span>
-                      )}
-                      {isAtm && !isSplitting && (
-                        <button
-                          onClick={() => onStartSplit(idx)}
-                          className="ml-1 rounded bg-on-surface-variant/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.05em] text-on-surface-variant hover:bg-on-surface-variant/20 transition-colors"
-                        >
-                          Split
-                        </button>
-                      )}
-                    </div>
+                    {!isExcluded && (
+                      <div className="flex items-center gap-1">
+                        {categories.length > 0 ? (
+                          <>
+                            <CategorySelector
+                              categories={categories}
+                              selectedId={currentCatId}
+                              onChange={(id) => onOverride(idx, id)}
+                            />
+                            <CategorySourceBadge
+                              source={
+                                overriddenCatId !== undefined
+                                  ? "mapping"
+                                  : row.category_source
+                              }
+                            />
+                          </>
+                        ) : (
+                          <span className="font-mono text-xs text-on-surface-variant">
+                            {currentCatName ?? "\u2014"}
+                            {row.category_source !== "none" && (
+                              <CategorySourceBadge source={row.category_source} />
+                            )}
+                          </span>
+                        )}
+                        {isAtm && !isSplitting && (
+                          <button
+                            onClick={() => onStartSplit(idx)}
+                            className="ml-1 rounded bg-on-surface-variant/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.05em] text-on-surface-variant hover:bg-on-surface-variant/20 transition-colors"
+                          >
+                            Split
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-2 text-center">
+                    {isExcluded ? (
+                      <button
+                        onClick={() => onRestoreRow(idx)}
+                        className="font-mono text-[10px] uppercase tracking-[0.05em] text-on-tertiary-container hover:text-on-tertiary-container/80 transition-colors"
+                        title="Restore transaction"
+                      >
+                        Undo
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onExcludeRow(idx)}
+                        className="font-mono text-[10px] text-on-error-container/60 hover:text-on-error-container transition-colors"
+                        title="Remove transaction"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </td>
                 </tr>
               </React.Fragment>
@@ -335,6 +432,8 @@ export function ImportModal() {
   const [splitStates, setSplitStates] = useState<Map<number, SplitState>>(
     new Map()
   );
+  const [excludedRows, setExcludedRows] = useState<Set<number>>(new Set());
+  const [amountOverrides, setAmountOverrides] = useState<Map<number, number>>(new Map());
   const [splittingRowIndex, setSplittingRowIndex] = useState<number | null>(null);
   const [splitNotes, setSplitNotes] = useState("");
   const [splitError, setSplitError] = useState<string | null>(null);
@@ -532,18 +631,27 @@ export function ImportModal() {
       splits.push({ row_index: rowIndex, items });
     });
 
+    const excludedArr = Array.from(excludedRows);
+    const amountArr = Array.from(amountOverrides.entries()).map(
+      ([row_index, amount]) => ({ row_index, amount })
+    );
+
     confirmMutation.mutate(
       {
         importId: preview.id,
         categoryOverrides:
           categoryOverrides.length > 0 ? categoryOverrides : undefined,
         splits: splits.length > 0 ? splits : undefined,
+        excludedRows: excludedArr.length > 0 ? excludedArr : undefined,
+        amountOverrides: amountArr.length > 0 ? amountArr : undefined,
       },
       {
         onSuccess: () => {
           setPreview(null);
           setOverrides(new Map());
           setSplitStates(new Map());
+          setExcludedRows(new Set());
+          setAmountOverrides(new Map());
           setSplittingRowIndex(null);
           setSplitNotes("");
           setSelectedFile(null);
@@ -570,6 +678,8 @@ export function ImportModal() {
     setPreview(null);
     setOverrides(new Map());
     setSplitStates(new Map());
+    setExcludedRows(new Set());
+    setAmountOverrides(new Map());
     setSplittingRowIndex(null);
     setSplitNotes("");
     setSelectedFile(null);
@@ -775,6 +885,19 @@ export function ImportModal() {
                   onStartSplit={handleStartSplit}
                   onUndoSplit={handleUndoSplit}
                   splittingRowIndex={splittingRowIndex}
+                  excludedRows={excludedRows}
+                  onExcludeRow={(idx) => setExcludedRows((prev) => new Set(prev).add(idx))}
+                  onRestoreRow={(idx) => {
+                    setExcludedRows((prev) => {
+                      const next = new Set(prev);
+                      next.delete(idx);
+                      return next;
+                    });
+                  }}
+                  amountOverrides={amountOverrides}
+                  onAmountChange={(idx, amount) =>
+                    setAmountOverrides((prev) => new Map(prev).set(idx, amount))
+                  }
                 />
 
                 {/* Split input */}

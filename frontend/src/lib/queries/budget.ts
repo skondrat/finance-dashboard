@@ -476,14 +476,18 @@ export function useConfirmImport() {
       importId: string;
       categoryOverrides?: CategoryOverride[];
       splits?: SplitOverride[];
+      excludedRows?: number[];
+      amountOverrides?: { row_index: number; amount: number }[];
     }
   >({
-    mutationFn: ({ importId, categoryOverrides, splits }) =>
+    mutationFn: ({ importId, categoryOverrides, splits, excludedRows, amountOverrides }) =>
       apiFetch(`/budget/import/${importId}/confirm`, {
         method: "POST",
         body: JSON.stringify({
           category_overrides: categoryOverrides ?? null,
           splits: splits ?? null,
+          excluded_rows: excludedRows ?? null,
+          amount_overrides: amountOverrides ?? null,
         }),
       }),
     onSuccess: () => {
