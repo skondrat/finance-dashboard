@@ -16,6 +16,7 @@ interface NodeDatum {
   label: string;
   type: string;
   level?: number;
+  color?: string;
 }
 
 interface LinkDatum {
@@ -29,11 +30,6 @@ type SLink = D3SankeyLink<NodeDatum, LinkDatum>;
 
 const INCOME_COLORS = ["#6b7280", "#4b5563", "#9ca3af", "#78716c", "#a1a1aa"];
 const INCOME_MERGED = "#525a65";
-const MAJOR_COLORS = [
-  "#6b7280", "#4b5563", "#78716c", "#57534e",
-  "#525252", "#71717a", "#44403c", "#64748b",
-  "#334155", "#475569",
-];
 const EXPENSE_COLORS = [
   "#9ca3af", "#78716c", "#6b7280", "#4b5563",
   "#57534e", "#a8a29e", "#a1a1aa", "#71717a",
@@ -42,12 +38,12 @@ const SAVINGS_GREEN = "#009668";
 const INVESTMENTS_COLOR = "#6b7280";
 
 function getNodeColor(node: NodeDatum, typeIndex: number): string {
+  // Use category color from backend when available
+  if (node.color) return node.color;
   if (node.id === "income") return INCOME_MERGED;
   switch (node.type) {
     case "income":
       return INCOME_COLORS[typeIndex % INCOME_COLORS.length];
-    case "major":
-      return MAJOR_COLORS[typeIndex % MAJOR_COLORS.length];
     case "savings":
       return SAVINGS_GREEN;
     case "investments":
@@ -57,13 +53,21 @@ function getNodeColor(node: NodeDatum, typeIndex: number): string {
   }
 }
 
-function getLinkColor(targetType: string, highlighted: boolean): string {
-  if (highlighted) {
-    if (targetType === "savings") return "rgba(0, 150, 104, 0.45)";
-    return "rgba(160, 160, 160, 0.35)";
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function getLinkColor(targetNode: NodeDatum, highlighted: boolean): string {
+  if (targetNode.color) {
+    return hexToRgba(targetNode.color, highlighted ? 0.4 : 0.15);
   }
-  if (targetType === "savings") return "rgba(0, 150, 104, 0.15)";
-  return "rgba(128, 128, 128, 0.12)";
+  if (targetNode.type === "savings") {
+    return highlighted ? "rgba(0, 150, 104, 0.45)" : "rgba(0, 150, 104, 0.15)";
+  }
+  return highlighted ? "rgba(160, 160, 160, 0.35)" : "rgba(128, 128, 128, 0.12)";
 }
 
 interface TooltipData {
@@ -106,6 +110,7 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
       label: n.label,
       type: n.type,
       level: n.level,
+      color: n.color,
     }));
 
     const links: LinkDatum[] = data.links
@@ -286,7 +291,7 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
                 <path
                   key={i}
                   d={d}
-                  fill={getLinkColor(targetNode.type, highlighted)}
+                  fill={getLinkColor(targetNode as NodeDatum, highlighted)}
                   stroke="none"
                   strokeWidth={0}
                   style={{

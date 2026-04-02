@@ -7,6 +7,7 @@ export interface SankeyNode {
   label: string;
   type: "income" | "major" | "expense" | "savings" | "investments";
   level?: number;
+  color?: string;
 }
 
 export interface SankeyLink {
