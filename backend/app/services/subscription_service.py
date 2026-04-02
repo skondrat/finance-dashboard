@@ -107,12 +107,26 @@ def sync_from_budget(db: Session, user_id: str) -> list[dict]:
     if not sub_cat:
         return []
 
-    # Get all transactions in this category
+    # Find the most recent month that has subscription transactions
+    latest_month = (
+        db.query(func.strftime("%Y-%m", BudgetTransaction.date))
+        .filter(
+            BudgetTransaction.user_id == user_id,
+            BudgetTransaction.category_id == sub_cat.id,
+            BudgetTransaction.amount < 0,
+        )
+        .order_by(BudgetTransaction.date.desc())
+        .limit(1)
+        .scalar()
+    )
+    if not latest_month:
+        return []
+
+    # Only get transactions from that month
     rows = (
         db.query(
             func.lower(BudgetTransaction.description).label("desc_lower"),
             BudgetTransaction.description,
-            func.strftime("%Y-%m", BudgetTransaction.date).label("month"),
             BudgetTransaction.amount,
             BudgetTransaction.currency,
             BudgetTransaction.date,
@@ -121,24 +135,25 @@ def sync_from_budget(db: Session, user_id: str) -> list[dict]:
             BudgetTransaction.user_id == user_id,
             BudgetTransaction.category_id == sub_cat.id,
             BudgetTransaction.amount < 0,
+            func.strftime("%Y-%m", BudgetTransaction.date) == latest_month,
         )
-        .order_by(BudgetTransaction.date.asc())
+        .order_by(BudgetTransaction.date.desc())
         .all()
     )
 
     if not rows:
         return []
 
-    # Group by description
-    by_desc: dict[str, list] = defaultdict(list)
+    # Group by description (deduplicate within the month — take latest)
+    by_desc: dict[str, dict] = {}
     for row in rows:
-        by_desc[row.desc_lower].append({
-            "description": row.description,
-            "month": row.month,
-            "amount": float(abs(row.amount)),
-            "currency": row.currency,
-            "date": row.date,
-        })
+        if row.desc_lower not in by_desc:
+            by_desc[row.desc_lower] = {
+                "description": row.description,
+                "amount": float(abs(row.amount)),
+                "currency": row.currency,
+                "date": row.date,
+            }
 
     # Get existing subscription names
     existing_names = {
@@ -147,30 +162,17 @@ def sync_from_budget(db: Session, user_id: str) -> list[dict]:
     }
 
     created = []
-    for desc, occurrences in by_desc.items():
+    for desc, entry in by_desc.items():
         if desc in existing_names:
             continue
 
-        months = sorted(set(o["month"] for o in occurrences))
-        latest = max(occurrences, key=lambda o: o["date"])
-
-        # Determine cadence: if appears 2+ months with gaps ~12 months → yearly, else monthly
-        cadence = "monthly"
-        if len(months) >= 2:
-            consecutive = _count_consecutive_months(months)
-            if consecutive < 2:
-                # Check if roughly yearly (gaps of ~11-13 months)
-                cadence = "yearly"
-        elif len(months) == 1:
-            cadence = "monthly"  # default assumption
-
         sub = Subscription(
             user_id=user_id,
-            name=latest["description"],
-            cadence=cadence,
-            amount=latest["amount"],
-            currency=latest["currency"],
-            payment_day=latest["date"].day if latest["date"] else None,
+            name=entry["description"],
+            cadence="monthly",
+            amount=entry["amount"],
+            currency=entry["currency"],
+            payment_day=entry["date"].day if entry["date"] else None,
         )
         db.add(sub)
         created.append({
