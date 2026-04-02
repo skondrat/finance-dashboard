@@ -146,6 +146,12 @@ export interface CreateManualSnapshotPayload {
   snapshot_month: string;
   total_networth: number;
   currency?: string;
+  breakdown?: Array<{
+    name: string;
+    balance: number;
+    source: string;
+    account_type: string | null;
+  }> | null;
 }
 
 export interface ManualSnapshotResponse {
