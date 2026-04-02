@@ -176,6 +176,7 @@ def _spend_for_period(
         BudgetTransaction.date >= start,
         BudgetTransaction.date < end,
         BudgetTransaction.amount < 0,
+        BudgetTransaction.is_investment == False,  # noqa: E712
         _confirmed_tx_filter(),
     )
     if category_id is not None:
@@ -375,6 +376,7 @@ def get_spend_by_category(
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.amount < 0,
+            BudgetTransaction.is_investment == False,  # noqa: E712
             _confirmed_tx_filter(),
         )
         .all()

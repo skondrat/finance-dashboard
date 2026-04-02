@@ -75,12 +75,13 @@ def income_vs_spend(
         key = (r.year, r.month)
         income_map[key] = income_map.get(key, _ZERO) + converted
 
-    # Aggregate spend (negative transactions) by year/month with currency conversion
+    # Aggregate spend (negative non-investment transactions) by year/month with currency conversion
     spend_txns = (
         db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
             BudgetTransaction.amount < 0,
+            BudgetTransaction.is_investment == False,  # noqa: E712
         )
         .all()
     )
@@ -135,12 +136,13 @@ def savings_over_time(
         key = (r.year, r.month)
         income_map[key] = income_map.get(key, _ZERO) + converted
 
-    # Spend by month with currency conversion
+    # Spend by month (excluding investments) with currency conversion
     spend_txns = (
         db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
             BudgetTransaction.amount < 0,
+            BudgetTransaction.is_investment == False,  # noqa: E712
         )
         .all()
     )
@@ -274,7 +276,7 @@ def category_distribution(
             else date(today.year, today.month + 1, 1)
         )
 
-    # Fetch all spend transactions (any currency) and convert to target currency
+    # Fetch non-investment spend transactions and convert to target currency
     spend_txns = (
         db.query(BudgetTransaction)
         .filter(
@@ -282,6 +284,7 @@ def category_distribution(
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.amount < 0,
+            BudgetTransaction.is_investment == False,  # noqa: E712
         )
         .all()
     )
