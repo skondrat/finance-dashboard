@@ -152,7 +152,7 @@ function PreviewTable({
                         <td className="py-2 pl-4 font-mono text-xs text-on-surface-variant">
                           {row.date}
                         </td>
-                        <td className="py-2 pl-4 font-body text-sm text-on-surface max-w-48 truncate">
+                        <td className="py-2 pl-4 font-body text-sm text-on-surface max-w-sm break-words">
                           <span className="text-on-surface-variant/50 mr-1">{"\u21B3"}</span>
                           {item.description}
                         </td>
@@ -193,7 +193,7 @@ function PreviewTable({
                       <td className="py-2 pl-4 font-mono text-xs text-on-surface-variant">
                         {row.date}
                       </td>
-                      <td className="py-2 pl-4 font-body text-sm text-on-surface max-w-48 truncate">
+                      <td className="py-2 pl-4 font-body text-sm text-on-surface max-w-sm break-words">
                         <span className="text-on-surface-variant/50 mr-1">{"\u21B3"}</span>
                         {row.description}
                         <span className="ml-1 text-on-surface-variant/50 text-xs">(remainder)</span>
@@ -256,7 +256,7 @@ function PreviewTable({
                   <td className="py-2 font-mono text-xs text-on-surface">
                     {row.date}
                   </td>
-                  <td className="py-2 font-body text-sm text-on-surface max-w-48 truncate">
+                  <td className="py-2 font-body text-sm text-on-surface max-w-sm break-words">
                     {row.description}
                   </td>
                   <td
@@ -631,7 +631,7 @@ export function ImportModal() {
           />
 
           {/* Modal */}
-          <div className="relative z-10 w-full max-w-3xl mx-4 rounded-2xl bg-surface-container-lowest/80 backdrop-blur-[20px] p-6 shadow-ambient">
+          <div className="relative z-10 w-full max-w-5xl mx-4 rounded-2xl bg-surface-container-lowest/80 backdrop-blur-[20px] p-6 shadow-ambient">
             <h2 className="font-display text-xl font-medium text-on-surface mb-4">
               Import Statement
             </h2>
