@@ -79,6 +79,7 @@ class BudgetTransactionUpdate(BaseModel):
     category_id: Optional[str] = None
     description: Optional[str] = None
     is_investment: Optional[bool] = None
+    amount: Optional[FloatDecimal] = None
 
 
 class BudgetTransactionResponse(BaseModel):

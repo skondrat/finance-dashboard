@@ -125,7 +125,7 @@ export default function BudgetPage() {
         <div className="col-span-12 space-y-6 lg:col-span-4">
           <div className="flex items-center gap-2">
             <ImportModal />
-            <AddSpendModal />
+            <AddSpendModal month={summaryMonth} year={summaryYear} />
             <SettingsMenu />
           </div>
           <IncomeManager year={summaryYear} month={summaryMonth} />

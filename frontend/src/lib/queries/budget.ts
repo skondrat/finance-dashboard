@@ -217,12 +217,26 @@ export function useUpdateBudgetTransaction() {
   return useMutation<
     BudgetTransaction,
     Error,
-    { id: string; category_id?: string | null; description?: string }
+    { id: string; category_id?: string | null; description?: string; amount?: number }
   >({
     mutationFn: ({ id, ...data }) =>
       apiFetch(`/budget/transactions/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
+    },
+  });
+}
+
+export function useDeleteBudgetTransaction() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: (id) =>
+      apiFetch(`/budget/transactions/${id}`, {
+        method: "DELETE",
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budget"] });
