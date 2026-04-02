@@ -63,6 +63,65 @@ def list_income_sources(
 
 
 # ---------------------------------------------------------------------------
+# Copy income sources from previous month
+# ---------------------------------------------------------------------------
+
+
+@router.post("/budget/income/copy-from-previous")
+def copy_income_from_previous(
+    target_year: int,
+    target_month: int,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Copy all income sources from the previous month into the target month."""
+    # Calculate previous month
+    if target_month == 1:
+        src_month, src_year = 12, target_year - 1
+    else:
+        src_month, src_year = target_month - 1, target_year
+
+    sources = (
+        db.query(IncomeSource)
+        .filter(
+            IncomeSource.user_id == user_id,
+            IncomeSource.year == src_year,
+            IncomeSource.month == src_month,
+        )
+        .all()
+    )
+
+    if not sources:
+        return {"copied": 0}
+
+    # Check if target month already has income sources
+    existing = (
+        db.query(IncomeSource)
+        .filter(
+            IncomeSource.user_id == user_id,
+            IncomeSource.year == target_year,
+            IncomeSource.month == target_month,
+        )
+        .count()
+    )
+    if existing > 0:
+        return {"copied": 0, "message": "Target month already has income sources"}
+
+    for src in sources:
+        db.add(IncomeSource(
+            user_id=user_id,
+            label=src.label,
+            amount=src.amount,
+            currency=src.currency,
+            month=target_month,
+            year=target_year,
+        ))
+
+    db.commit()
+    return {"copied": len(sources)}
+
+
+# ---------------------------------------------------------------------------
 # Create income source
 # ---------------------------------------------------------------------------
 

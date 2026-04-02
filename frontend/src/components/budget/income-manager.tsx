@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useIncomes, type IncomeSource } from "@/lib/queries/budget";
+import { useIncomes, useCopyIncomeFromPrevious, type IncomeSource } from "@/lib/queries/budget";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { apiFetch } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
@@ -17,6 +17,7 @@ export function IncomeManager({ year, month }: IncomeManagerProps) {
   const currency = useCurrencyStore((s) => s.currency);
   const queryClient = useQueryClient();
 
+  const copyMutation = useCopyIncomeFromPrevious();
   const [isAdding, setIsAdding] = useState(false);
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
@@ -105,9 +106,20 @@ export function IncomeManager({ year, month }: IncomeManagerProps) {
           ))}
 
           {incomes?.length === 0 && (
-            <p className="py-4 text-center font-body text-sm text-on-surface-variant">
-              No income sources yet.
-            </p>
+            <div className="py-4 text-center space-y-2">
+              <p className="font-body text-sm text-on-surface-variant">
+                No income sources yet.
+              </p>
+              {year && month && (
+                <button
+                  onClick={() => copyMutation.mutate({ year, month })}
+                  disabled={copyMutation.isPending}
+                  className="font-mono text-xs text-on-surface-variant underline decoration-dotted hover:text-on-surface transition-colors disabled:opacity-50"
+                >
+                  {copyMutation.isPending ? "Copying..." : "Copy from previous month"}
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
