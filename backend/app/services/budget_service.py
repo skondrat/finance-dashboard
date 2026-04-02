@@ -140,14 +140,14 @@ def _income_for_period(
     """Sum IncomeSource amounts for months overlapping the date range,
     converting all currencies to *currency*."""
     start_ym = start.year * 12 + start.month
-    end_ym = end.year * 12 + end.month
+    end_ym = end.year * 12 + end.month  # end is exclusive, so use <
 
     rows = (
         db.query(IncomeSource)
         .filter(
             IncomeSource.user_id == user_id,
             (IncomeSource.year * 12 + IncomeSource.month) >= start_ym,
-            (IncomeSource.year * 12 + IncomeSource.month) <= end_ym,
+            (IncomeSource.year * 12 + IncomeSource.month) < end_ym,
         )
         .all()
     )

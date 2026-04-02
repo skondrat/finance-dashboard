@@ -6,7 +6,12 @@ import { apiFetch } from "@/lib/api";
 import { useImportCategories } from "@/lib/queries/budget";
 import { useCurrencyStore } from "@/stores/currency-store";
 
-export function AddSpendModal() {
+interface AddSpendModalProps {
+  month?: number;
+  year?: number;
+}
+
+export function AddSpendModal({ month, year }: AddSpendModalProps) {
   const [open, setOpen] = useState(false);
   const [categoryId, setCategoryId] = useState("");
   const [amount, setAmount] = useState("");
@@ -53,7 +58,11 @@ export function AddSpendModal() {
     setError(null);
 
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const targetYear = year ?? now.getFullYear();
+      const targetMonth = month ?? (now.getMonth() + 1);
+      // Use the 15th of the selected month as a reasonable default date
+      const today = `${targetYear}-${String(targetMonth).padStart(2, "0")}-15`;
       await apiFetch("/budget/transactions", {
         method: "POST",
         body: JSON.stringify({
