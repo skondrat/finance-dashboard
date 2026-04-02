@@ -12,20 +12,22 @@ import { useCategoryDistribution } from "@/lib/queries/budget-charts";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { formatCurrency } from "@/lib/utils";
 
-// Monochromatic palette — mid-range grays visible on both light and dark backgrounds
-const MONO_PALETTE = [
-  "#6b7280",
-  "#4b5563",
-  "#9ca3af",
-  "#374151",
-  "#78716c",
-  "#a1a1aa",
-  "#57534e",
-  "#d4d4d8",
-  "#009668",
-  "#71717a",
-  "#52525b",
-  "#a8a29e",
+const VIBRANT_PALETTE = [
+  "#3B82F6", // blue
+  "#22C55E", // green
+  "#EAB308", // yellow
+  "#A855F7", // purple
+  "#EF4444", // red
+  "#F97316", // orange
+  "#06B6D4", // cyan
+  "#EC4899", // pink
+  "#10B981", // emerald
+  "#8B5CF6", // violet
+  "#14B8A6", // teal
+  "#F59E0B", // amber
+  "#64748B", // slate
+  "#6366F1", // indigo
+  "#84CC16", // lime
 ];
 
 interface CustomTooltipProps {
@@ -73,7 +75,7 @@ export function CategoryDistributionChart({
 
   const chartData = data?.categories.map((cat, idx) => ({
     ...cat,
-    fill: cat.color || MONO_PALETTE[idx % MONO_PALETTE.length],
+    fill: cat.color || VIBRANT_PALETTE[idx % VIBRANT_PALETTE.length],
   })) ?? [];
 
   return (

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useCreateManualSnapshot } from "@/lib/queries/networth";
+import { useNetworthSummary } from "@/lib/queries/networth";
 import { useCurrencyStore } from "@/stores/currency-store";
-import { cn } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 
 const MONTHS = [
   { value: "01", label: "January" },
@@ -38,25 +39,59 @@ export function ImportNetworthModal({ open, onClose }: ImportNetworthModalProps)
   const now = new Date();
   const [month, setMonth] = useState(String(now.getMonth() + 1).padStart(2, "0"));
   const [year, setYear] = useState(String(now.getFullYear()));
-  const [value, setValue] = useState("");
   const currency = useCurrencyStore((s) => s.currency);
 
+  const { data: summary } = useNetworthSummary();
   const mutation = useCreateManualSnapshot();
+
+  const accounts = summary?.accounts ?? [];
+  const hasAccounts = accounts.length > 0;
+
+  // Per-account balances, all default to 0
+  const [balances, setBalances] = useState<number[]>([]);
+
+  // Reset balances when modal opens or accounts change
+  useEffect(() => {
+    if (open && accounts.length > 0) {
+      setBalances(accounts.map(() => 0));
+    }
+  }, [open, accounts.length]);
+
+  const liveTotal = balances.reduce((sum, b) => sum + (b || 0), 0);
+
+  function handleBalanceChange(index: number, value: string) {
+    setBalances((prev) => {
+      const next = [...prev];
+      next[index] = parseFloat(value) || 0;
+      return next;
+    });
+  }
 
   function handleClose() {
     mutation.reset();
-    setValue("");
+    setBalances([]);
     onClose();
   }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const parsed = parseFloat(value);
-    if (isNaN(parsed)) return;
+    if (!hasAccounts) return;
 
     const snapshotMonth = `${year}-${month}`;
+    const breakdown = accounts.map((acct, i) => ({
+      name: acct.name,
+      balance: balances[i] ?? 0,
+      source: acct.source,
+      account_type: acct.account_type,
+    }));
+
     mutation.mutate(
-      { snapshot_month: snapshotMonth, total_networth: parsed, currency },
+      {
+        snapshot_month: snapshotMonth,
+        total_networth: liveTotal,
+        currency,
+        breakdown,
+      },
       { onSuccess: handleClose }
     );
   }
@@ -70,12 +105,13 @@ export function ImportNetworthModal({ open, onClose }: ImportNetworthModalProps)
         onClick={handleClose}
       />
 
-      <div className="relative z-10 w-full max-w-md mx-4 rounded-2xl bg-surface-container-lowest p-6 shadow-ambient">
+      <div className="relative z-10 w-full max-w-lg mx-4 rounded-2xl bg-surface-container-lowest p-6 shadow-ambient max-h-[85vh] flex flex-col">
         <h2 className="font-display text-xl font-medium text-on-surface mb-6">
           Import Previous Networth
         </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 min-h-0">
+          {/* Month/Year selector */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant mb-1.5">
@@ -112,19 +148,41 @@ export function ImportNetworthModal({ open, onClose }: ImportNetworthModalProps)
             </div>
           </div>
 
-          <div>
-            <label className="block font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant mb-1.5">
-              Total Networth ({currency})
-            </label>
-            <input
-              type="number"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              step="0.01"
-              placeholder="e.g. 50000"
-              className="w-full rounded-md bg-surface-container-highest px-3 py-2.5 font-mono text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:bg-surface-container-lowest focus:outline focus:outline-outline-variant/20"
-            />
-          </div>
+          {/* Account breakdown or no-accounts message */}
+          {!hasAccounts ? (
+            <p className="font-mono text-sm text-on-surface-variant py-4 text-center">
+              Add accounts first to import historical net worth
+            </p>
+          ) : (
+            <div className="overflow-y-auto min-h-0 space-y-3 pr-1">
+              {accounts.map((acct, i) => (
+                <div key={acct.id} className="flex items-center gap-3">
+                  <span className="font-mono text-xs text-on-surface-variant w-40 truncate shrink-0">
+                    {acct.name}
+                  </span>
+                  <input
+                    type="number"
+                    value={balances[i] ?? 0}
+                    onChange={(e) => handleBalanceChange(i, e.target.value)}
+                    step="0.01"
+                    className="w-full rounded-md bg-surface-container-highest px-3 py-2 font-mono text-sm text-on-surface focus:bg-surface-container-lowest focus:outline focus:outline-outline-variant/20"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Live total */}
+          {hasAccounts && (
+            <div className="flex items-center justify-between border-t border-outline-variant/20 pt-3">
+              <span className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
+                Total
+              </span>
+              <span className="font-display text-lg font-medium text-on-surface">
+                {formatCurrency(liveTotal, currency)}
+              </span>
+            </div>
+          )}
 
           {mutation.isError && (
             <p className="font-mono text-xs text-on-error-container">
@@ -143,7 +201,7 @@ export function ImportNetworthModal({ open, onClose }: ImportNetworthModalProps)
             </button>
             <button
               type="submit"
-              disabled={mutation.isPending || !value}
+              disabled={mutation.isPending || !hasAccounts}
               className={cn(
                 "rounded-xl bg-primary px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-50"
               )}

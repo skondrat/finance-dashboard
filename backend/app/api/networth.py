@@ -364,6 +364,7 @@ def create_manual_snapshot(
         total_networth=Decimal(str(payload.total_networth)),
         currency=payload.currency,
         source="manual",
+        breakdown=payload.breakdown,
     )
     db.add(snapshot)
     db.commit()

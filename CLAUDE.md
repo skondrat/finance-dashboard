@@ -71,6 +71,7 @@ Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
 - 042-edit-delete-transactions: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query, Zustand (frontend)
+- 041-import-nw-breakdown: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query (frontend)
 - 040-edit-networth-snapshot: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query, Zustand (frontend)
 - 039-budget-spending-charts: Added TypeScript 5 (frontend only) + Next.js 16, Recharts 3, TanStack Query
 

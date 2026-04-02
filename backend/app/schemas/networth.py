@@ -77,6 +77,7 @@ class ManualSnapshotCreate(BaseModel):
     snapshot_month: str  # "YYYY-MM"
     total_networth: float
     currency: str = "EUR"
+    breakdown: Optional[list] = None
 
 
 class ManualSnapshotResponse(BaseModel):
