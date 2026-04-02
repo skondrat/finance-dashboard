@@ -36,8 +36,8 @@ export function BreakdownRow({ year, month }: BreakdownRowProps) {
     );
   }
 
-  // Separate income nodes and expense nodes from the data
-  const incomeNodes = data.nodes.filter((n) => n.type === "income");
+  // Separate income source nodes (level 0) and final expense nodes (level 3)
+  const incomeNodes = data.nodes.filter((n) => n.type === "income" && n.level === 0);
   const expenseNodes = data.nodes.filter((n) => n.type === "expense");
 
   // Calculate totals per node from links

@@ -4,8 +4,7 @@
 
 ### ~~Should have a proper Month Selector~~ (DONE - PR #44)
 
-### Lefside should show Income source -> Income bar -> Major categories (you can define the list based of existing categories) -> Final categories
-e.g for March I would have at first level two blocks (Gainsight salary and Paysera Tech) which on second level merge itno Income block, on third level split into Major cateogires, on fourth level split into final categories from Budget. 
+### ~~Lefside should show Income source -> Income bar -> Major categories -> Final categories~~ (DONE - PR #45)
 
 ### Should be more interactive, maybe with ability to zoom in zoom out
 
