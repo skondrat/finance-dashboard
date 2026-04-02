@@ -14,11 +14,19 @@ import { SettingsMenu } from "@/components/budget/settings-menu";
 import { TransactionList } from "@/components/budget/transaction-list";
 import { useImportCategories } from "@/lib/queries/budget";
 
+function readSessionInt(key: string, fallback: number): number {
+  if (typeof window === "undefined") return fallback;
+  const v = sessionStorage.getItem(key);
+  return v ? parseInt(v, 10) : fallback;
+}
+
 export default function BudgetPage() {
   const now = new Date();
   const [period, setPeriod] = useState<Period>("monthly");
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonthRaw] = useState(() => readSessionInt("budget_month", now.getMonth() + 1));
+  const [year, setYearRaw] = useState(() => readSessionInt("budget_year", now.getFullYear()));
+  const setMonth = (m: number) => { sessionStorage.setItem("budget_month", String(m)); setMonthRaw(m); };
+  const setYear = (y: number) => { sessionStorage.setItem("budget_year", String(y)); setYearRaw(y); };
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [txCategoryFilter, setTxCategoryFilter] = useState<string | null>(null);
