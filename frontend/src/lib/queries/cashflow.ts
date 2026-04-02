@@ -5,7 +5,8 @@ import { useCurrencyStore } from "@/stores/currency-store";
 export interface SankeyNode {
   id: string;
   label: string;
-  type: "income" | "expense" | "savings" | "investments";
+  type: "income" | "major" | "expense" | "savings" | "investments";
+  level?: number;
 }
 
 export interface SankeyLink {

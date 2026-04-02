@@ -7,7 +7,7 @@ import {
   SankeyNode as D3SankeyNode,
   SankeyLink as D3SankeyLink,
 } from "d3-sankey";
-import { useCashflowSankey, SankeyNode, SankeyLink } from "@/lib/queries/cashflow";
+import { useCashflowSankey } from "@/lib/queries/cashflow";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { formatCurrency } from "@/lib/utils";
 
@@ -15,6 +15,7 @@ interface NodeDatum {
   id: string;
   label: string;
   type: string;
+  level?: number;
 }
 
 interface LinkDatum {
@@ -26,21 +27,33 @@ interface LinkDatum {
 type SNode = D3SankeyNode<NodeDatum, LinkDatum>;
 type SLink = D3SankeyLink<NodeDatum, LinkDatum>;
 
-const INCOME_GRAYS = ["#6b7280", "#4b5563", "#9ca3af", "#78716c", "#a1a1aa"];
-const EXPENSE_GRAYS = ["#9ca3af", "#78716c", "#6b7280", "#4b5563", "#57534e", "#a8a29e", "#a1a1aa", "#71717a"];
+const INCOME_COLORS = ["#6b7280", "#4b5563", "#9ca3af", "#78716c", "#a1a1aa"];
+const INCOME_MERGED = "#525a65";
+const MAJOR_COLORS = [
+  "#6b7280", "#4b5563", "#78716c", "#57534e",
+  "#525252", "#71717a", "#44403c", "#64748b",
+  "#334155", "#475569",
+];
+const EXPENSE_COLORS = [
+  "#9ca3af", "#78716c", "#6b7280", "#4b5563",
+  "#57534e", "#a8a29e", "#a1a1aa", "#71717a",
+];
 const SAVINGS_GREEN = "#009668";
 const INVESTMENTS_COLOR = "#6b7280";
 
-function getNodeColor(node: NodeDatum, index: number): string {
+function getNodeColor(node: NodeDatum, typeIndex: number): string {
+  if (node.id === "income") return INCOME_MERGED;
   switch (node.type) {
     case "income":
-      return INCOME_GRAYS[index % INCOME_GRAYS.length];
+      return INCOME_COLORS[typeIndex % INCOME_COLORS.length];
+    case "major":
+      return MAJOR_COLORS[typeIndex % MAJOR_COLORS.length];
     case "savings":
       return SAVINGS_GREEN;
     case "investments":
       return INVESTMENTS_COLOR;
     default:
-      return EXPENSE_GRAYS[index % EXPENSE_GRAYS.length];
+      return EXPENSE_COLORS[typeIndex % EXPENSE_COLORS.length];
   }
 }
 
@@ -66,9 +79,9 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
   const currency = useCurrencyStore((s) => s.currency);
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
-  const width = 800;
-  const height = 500;
-  const margin = { top: 16, right: 120, bottom: 16, left: 120 };
+  const width = 1000;
+  const height = 600;
+  const margin = { top: 16, right: 140, bottom: 16, left: 120 };
 
   const layout = useMemo(() => {
     if (!data || data.nodes.length === 0 || data.links.length === 0) return null;
@@ -80,12 +93,11 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
       id: n.id,
       label: n.label,
       type: n.type,
+      level: n.level,
     }));
 
     const links: LinkDatum[] = data.links
-      .filter(
-        (l) => nodeIdMap.has(l.source) && nodeIdMap.has(l.target)
-      )
+      .filter((l) => nodeIdMap.has(l.source) && nodeIdMap.has(l.target))
       .map((l) => ({
         source: l.source,
         target: l.target,
@@ -97,7 +109,8 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
     const generator = sankey<NodeDatum, LinkDatum>()
       .nodeId((d) => d.id)
       .nodeWidth(14)
-      .nodePadding(16)
+      .nodePadding(14)
+      .nodeSort(null)
       .extent([
         [margin.left, margin.top],
         [width - margin.right, height - margin.bottom],
@@ -140,7 +153,7 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
   if (isLoading) {
     return (
       <div className="rounded-2xl bg-surface-container-low p-6">
-        <div className="h-[500px] animate-pulse rounded-xl bg-surface-container-lowest" />
+        <div className="h-[600px] animate-pulse rounded-xl bg-surface-container-lowest" />
       </div>
     );
   }
@@ -148,7 +161,7 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
   if (!data || !layout) {
     return (
       <div className="rounded-2xl bg-surface-container-low p-6">
-        <div className="flex h-[500px] items-center justify-center">
+        <div className="flex h-[600px] items-center justify-center">
           <p className="font-mono text-sm text-on-surface-variant">
             No cashflow data for this month
           </p>
@@ -158,8 +171,9 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
   }
 
   const pathGenerator = sankeyLinkHorizontal<SNode, SLink>();
-  const incomeIdx = { current: 0 };
-  const expenseIdx = { current: 0 };
+
+  // Track color indices per type
+  const typeCounters: Record<string, number> = {};
 
   return (
     <div className="rounded-2xl bg-surface-container-low p-6">
@@ -199,12 +213,10 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
 
           {/* Nodes */}
           {layout.nodes.map((node) => {
-            let colorIndex = 0;
-            if (node.type === "income") {
-              colorIndex = incomeIdx.current++;
-            } else if (node.type === "expense") {
-              colorIndex = expenseIdx.current++;
-            }
+            const nodeType = node.type ?? "expense";
+            const colorKey = node.id === "income" ? "income-merged" : nodeType;
+            typeCounters[colorKey] = (typeCounters[colorKey] ?? 0);
+            const colorIndex = typeCounters[colorKey]++;
 
             const x0 = node.x0 ?? 0;
             const x1 = node.x1 ?? 0;
@@ -215,7 +227,10 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
             if (nodeHeight < 1) return null;
 
             const color = getNodeColor(node as NodeDatum, colorIndex);
-            const isLeft = x0 < width / 2;
+
+            // Label positioning: level 0 and 1 labels on left, level 2 and 3 on right
+            const level = (node as NodeDatum).level ?? 0;
+            const labelOnLeft = level <= 1;
 
             return (
               <g
@@ -232,9 +247,9 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
                   rx={2}
                 />
                 <text
-                  x={isLeft ? x0 - 8 : x1 + 8}
+                  x={labelOnLeft ? x0 - 8 : x1 + 8}
                   y={(y0 + y1) / 2}
-                  textAnchor={isLeft ? "end" : "start"}
+                  textAnchor={labelOnLeft ? "end" : "start"}
                   dominantBaseline="central"
                   className="font-mono text-xs fill-on-surface-variant"
                   style={{ fontSize: 11, fontFamily: "var(--font-mono)" }}
