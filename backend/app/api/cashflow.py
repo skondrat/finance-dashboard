@@ -9,7 +9,6 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id
@@ -17,6 +16,7 @@ from app.database import get_db
 from app.models.budget_transaction import BudgetTransaction
 from app.models.category import Category
 from app.models.income_source import IncomeSource
+from app.services.budget_service import _convert_amount
 
 router = APIRouter(prefix="/api/v1", tags=["cashflow"])
 
@@ -109,54 +109,59 @@ def get_cashflow_sankey(
     start = date(year, month, 1)
     end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
 
-    # ── Income sources ─────────────────────────────────────────────────────
-    income_rows = (
-        db.query(IncomeSource.label, IncomeSource.amount)
+    # ── Income sources (all currencies, converted) ──────────────────────────
+    rate_cache: dict = {}
+    raw_income = (
+        db.query(IncomeSource.label, IncomeSource.amount, IncomeSource.currency)
         .filter(
             IncomeSource.user_id == user_id,
-            IncomeSource.currency == currency,
             IncomeSource.year == year,
             IncomeSource.month == month,
         )
         .all()
     )
-    total_income = sum((Decimal(str(r.amount)) for r in income_rows), _ZERO)
+    income_rows: list[tuple[str, Decimal]] = []
+    total_income = _ZERO
+    for r in raw_income:
+        amt = _convert_amount(db, Decimal(str(r.amount)), r.currency, currency, start, rate_cache)
+        income_rows.append((r.label, amt))
+        total_income += amt
 
-    # ── Expenses (grouped by category) ─────────────────────────────────────
-    spend_rows = (
-        db.query(
-            BudgetTransaction.category_id,
-            func.sum(BudgetTransaction.amount).label("total"),
-        )
+    # ── Expenses (all currencies, converted, grouped by category) ──────────
+    raw_expenses = (
+        db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
-            BudgetTransaction.currency == currency,
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.amount < 0,
             BudgetTransaction.is_investment == False,  # noqa: E712
         )
-        .group_by(BudgetTransaction.category_id)
         .all()
     )
+    spend_by_cat: dict[str | None, Decimal] = {}
+    for tx in raw_expenses:
+        amt = abs(_convert_amount(db, Decimal(str(tx.amount)), tx.currency, currency, tx.date, rate_cache))
+        spend_by_cat[tx.category_id] = spend_by_cat.get(tx.category_id, _ZERO) + amt
 
-    # ── Investments ─────────────────────────────────────────────────────────
-    investment_total_raw = (
-        db.query(func.coalesce(func.sum(BudgetTransaction.amount), 0))
+    # ── Investments (all currencies, converted) ────────────────────────────
+    raw_investments = (
+        db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
-            BudgetTransaction.currency == currency,
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.is_investment == True,  # noqa: E712
             BudgetTransaction.amount < 0,
         )
-        .scalar()
+        .all()
     )
-    investment_total = abs(Decimal(str(investment_total_raw))) if investment_total_raw else _ZERO
+    investment_total = _ZERO
+    for tx in raw_investments:
+        investment_total += abs(_convert_amount(db, Decimal(str(tx.amount)), tx.currency, currency, tx.date, rate_cache))
 
     # ── Resolve category names and colors ─────────────────────────────────
-    category_ids = [r.category_id for r in spend_rows if r.category_id is not None]
+    category_ids = [cid for cid in spend_by_cat.keys() if cid is not None]
     cat_map: dict[str | None, str] = {}
     cat_color_map: dict[str | None, str] = {}
     if category_ids:
@@ -166,12 +171,10 @@ def get_cashflow_sankey(
 
     # (node_id, cat_name, amount, major_group, color)
     expense_entries: list[tuple[str, str, Decimal, str, str]] = []
-    for row in spend_rows:
-        cat_id = row.category_id
+    for cat_id, amount in spend_by_cat.items():
         cat_name = cat_map.get(cat_id, "Uncategorized") if cat_id else "Uncategorized"
         cat_color = cat_color_map.get(cat_id, "#6b7280") if cat_id else "#6b7280"
         node_id = f"final-{cat_id}" if cat_id else "final-uncategorized"
-        amount = abs(Decimal(str(row.total)))
         major = MAJOR_CATEGORY_MAP.get(cat_name, "Other")
         expense_entries.append((node_id, cat_name, amount, major, cat_color))
 
@@ -183,10 +186,10 @@ def get_cashflow_sankey(
     links: list[dict] = []
 
     # Level 0: Income source nodes
-    for idx, row in enumerate(income_rows):
+    for idx, (label, _amt) in enumerate(income_rows):
         nodes.append({
             "id": f"source-{idx}",
-            "label": row.label,
+            "label": label,
             "type": "income",
             "level": 0,
         })
@@ -249,13 +252,12 @@ def get_cashflow_sankey(
 
     # Level 0 → 1: Income sources → merged Income
     if total_income > _ZERO:
-        for idx, row in enumerate(income_rows):
-            val = Decimal(str(row.amount))
-            if val > _ZERO:
+        for idx, (_label, amt) in enumerate(income_rows):
+            if amt > _ZERO:
                 links.append({
                     "source": f"source-{idx}",
                     "target": "income",
-                    "value": _q(val),
+                    "value": _q(amt),
                 })
 
     # Level 1 → 2: Income → Major categories / Savings / Investments
