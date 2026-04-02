@@ -12,7 +12,8 @@ import { DebugMenu } from "@/components/budget/debug-menu";
 import { SpendingCharts } from "@/components/budget/spending-charts";
 import { SettingsMenu } from "@/components/budget/settings-menu";
 import { TransactionList } from "@/components/budget/transaction-list";
-import { useImportCategories } from "@/lib/queries/budget";
+import { useImportCategories, useBudgetTransactions, useBudgetSummary, useSpendByCategory } from "@/lib/queries/budget";
+import { exportTransactionsCSV, exportSummaryCSV } from "@/lib/csv-export";
 
 function readSessionInt(key: string, fallback: number): number {
   if (typeof window === "undefined") return fallback;
@@ -35,6 +36,9 @@ export default function BudgetPage() {
     useImportCategories();
   const categories = categoriesData?.categories ?? [];
   const hasCategories = categories.length > 0;
+
+  const { data: summaryData } = useBudgetSummary(period, period === "monthly" ? month : undefined, period === "monthly" || period === "yearly" ? year : undefined, period === "custom" ? fromDate : undefined, period === "custom" ? toDate : undefined);
+  const { data: spendData } = useSpendByCategory(period, period === "monthly" ? month : undefined, period === "monthly" || period === "yearly" ? year : undefined, period === "custom" ? fromDate : undefined, period === "custom" ? toDate : undefined);
 
   const summaryMonth = period === "monthly" ? month : undefined;
   const summaryYear =
@@ -60,6 +64,30 @@ export default function BudgetPage() {
     if (period === "custom") return toDate || undefined;
     return undefined;
   })();
+
+  const { data: allTransactions } = useBudgetTransactions({ from: txFrom, to: txTo, per_page: 200 });
+
+  function handleExport() {
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const label = period === "monthly" ? `${monthNames[month - 1]}_${year}` : `${period}_${year}`;
+
+    if (allTransactions && allTransactions.length > 0) {
+      exportTransactionsCSV(allTransactions, `transactions_${label}.csv`);
+    }
+    if (summaryData && spendData) {
+      exportSummaryCSV(
+        spendData.map((s) => ({
+          name: s.category.name,
+          budget: s.budget ?? 0,
+          spent: s.spent,
+          remaining: s.remaining ?? 0,
+          pct: s.pct_of_total,
+        })),
+        { income: summaryData.income, spend: summaryData.spend, savings: summaryData.savings, saving_rate: summaryData.saving_rate, currency: "EUR" },
+        `budget_summary_${label}.csv`
+      );
+    }
+  }
 
   if (categoriesLoading) {
     return null;
@@ -134,6 +162,12 @@ export default function BudgetPage() {
           <div className="flex items-center gap-2">
             <ImportModal />
             <AddSpendModal month={summaryMonth} year={summaryYear} />
+            <button
+              onClick={handleExport}
+              className="rounded-xl bg-surface-container-high px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-on-surface transition-colors hover:bg-surface-container-highest cursor-pointer"
+            >
+              Export CSV
+            </button>
             <SettingsMenu />
           </div>
           <IncomeManager year={summaryYear} month={summaryMonth} />
