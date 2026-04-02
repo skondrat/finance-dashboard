@@ -1,17 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SubscriptionList } from "@/components/subscriptions/subscription-list";
 import { SubscriptionModal } from "@/components/subscriptions/subscription-modal";
 import { SuggestionCards } from "@/components/subscriptions/suggestion-cards";
-import { useSubscriptions, type Subscription } from "@/lib/queries/subscriptions";
+import { useSubscriptions, useSyncSubscriptionsFromBudget, type Subscription } from "@/lib/queries/subscriptions";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export default function SubscriptionsPage() {
   const { data: subscriptions, isLoading } = useSubscriptions();
+  const syncMutation = useSyncSubscriptionsFromBudget();
+  const hasSynced = useRef(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editSub, setEditSub] = useState<Subscription | null>(null);
   const [detectEnabled, setDetectEnabled] = useState(false);
+
+  // Auto-sync subscriptions from budget "Subscriptions" category on page load
+  useEffect(() => {
+    if (!hasSynced.current) {
+      hasSynced.current = true;
+      syncMutation.mutate();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasSubscriptions = subscriptions && subscriptions.length > 0;
 
