@@ -145,8 +145,8 @@ def delete_category(
 
 
 _REQUIRED_CATEGORIES = [
-    {"name": "Other", "color": "#6B7280"},
-    {"name": "ATM Withdrawal", "color": "#4c4546"},
+    {"name": "Other", "color": "#94A3B8"},
+    {"name": "ATM Withdrawal", "color": "#C084FC"},
 ]
 
 
