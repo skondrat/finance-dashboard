@@ -1,21 +1,44 @@
 # Ideas & Backlog
 
+## Cashflow
 
-## Transaction List View
+### ~~Should have a proper Month Selector~~ (DONE - PR #44)
 
-* ~~There's no way to see individual Budget transactions after import. Add a transaction list view (accessible from clicking a category row or a new tab) with date, description, amount, category. Include search/filter.~~ (DONE - PR #32)
+### Lefside should show Income source -> Income bar -> Major categories (you can define the list based of existing categories) -> Final categories
+e.g for March I would have at first level two blocks (Gainsight salary and Paysera Tech) which on second level merge itno Income block, on third level split into Major cateogires, on fourth level split into final categories from Budget. 
 
-## Account edit in Portfolio
+### Should be more interactive, maybe with ability to zoom in zoom out
 
-* ~~Accounts should be editable - names, types~~ (DONE - PR #33)
+### Should be colorful, like in Budget categories.
 
-## ~~Add sorting for columns in Networth tab~~ (DONE - PR #34)
+## Overall
 
-## ~~Make Donuts charts colors more colorful, similar to how it is in Budget Categories~~ (DONE - PR #35)
+### Remove issue with Invalid or expired token
+
+## Budget tab
+
+### When Importing statement Description if long is not seen, should be visible. (you can also make the model broader I think)
+
+### I should be able to remove transactions during import or change their among
+
+### When I reload page month goes to current, not the one I selected
+
+### During import statement there should be a more visible scroll bar for transactions during their classification. it's hard to see how many left to manually categorize
+
+### The donut chart of spending categories should be more interactive, like when I hover a sector, it should be highlighet or something
+
+### If spend goes as Investment category, it doesn't count into monthly spend. as a result it should not affect Monthly Savings and Saving Rate, just Investment Rate.
+
+## Subscriptions
+
+### Everything marked as Subscription from latest Budget data should be here with values, dates and cadence (monthly/yearly)
+
+### Remove button Detect
+
 
 ---
 
-## Glacier (Low Priority / Someday)
+# Glacier (Low Priority / Someday)
 
 ### Export to CSV/PDF
 

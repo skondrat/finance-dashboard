@@ -24,14 +24,16 @@ export interface CashflowSankeyData {
   links: SankeyLink[];
 }
 
-export function useCashflowSankey() {
+export function useCashflowSankey(year?: number, month?: number) {
   const currency = useCurrencyStore((s) => s.currency);
 
   return useQuery<CashflowSankeyData>({
-    queryKey: ["cashflow", "sankey", currency],
+    queryKey: ["cashflow", "sankey", currency, year, month],
     queryFn: () => {
       const params = new URLSearchParams();
       if (currency) params.set("currency", currency);
+      if (year !== undefined) params.set("year", String(year));
+      if (month !== undefined) params.set("month", String(month));
       const query = params.toString();
       return apiFetch<CashflowSankeyData>(
         `/cashflow/sankey${query ? `?${query}` : ""}`

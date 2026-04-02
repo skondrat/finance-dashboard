@@ -35,15 +35,18 @@ def _last_completed_month() -> tuple[int, int]:
 @router.get("/cashflow/sankey")
 def get_cashflow_sankey(
     currency: Optional[str] = Query("EUR"),
+    year: Optional[int] = Query(None),
+    month: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
-    """Return Sankey diagram data for the last completed month.
+    """Return Sankey diagram data for a given month.
 
     Response shape:
       { month, nodes: [{id, label, type}], links: [{source, target, value}] }
     """
-    year, month = _last_completed_month()
+    if year is None or month is None:
+        year, month = _last_completed_month()
     start = date(year, month, 1)
     if month == 12:
         end = date(year + 1, 1, 1)

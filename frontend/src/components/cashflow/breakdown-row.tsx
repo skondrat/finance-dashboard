@@ -4,8 +4,13 @@ import { useCashflowSankey } from "@/lib/queries/cashflow";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { formatCurrency } from "@/lib/utils";
 
-export function BreakdownRow() {
-  const { data, isLoading } = useCashflowSankey();
+interface BreakdownRowProps {
+  year: number;
+  month: number;
+}
+
+export function BreakdownRow({ year, month }: BreakdownRowProps) {
+  const { data, isLoading } = useCashflowSankey(year, month);
   const currency = useCurrencyStore((s) => s.currency);
 
   if (isLoading || !data) {
