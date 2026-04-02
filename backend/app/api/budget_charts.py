@@ -346,3 +346,87 @@ def category_distribution(
         "total_spend": float(total_spend.quantize(_QUANT_2, rounding=ROUND_HALF_UP)),
         "categories": data,
     }
+
+
+# ---------------------------------------------------------------------------
+# Spending Trends by Category (multi-month)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/budget/charts/spending-trends")
+def spending_trends(
+    months: int = Query(default=6, ge=1, le=60),
+    currency: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Return top-N category spending over time for the last N months."""
+    currency = currency or "EUR"
+    month_range = _month_range(months)
+
+    # Fetch all non-investment spend transactions in range
+    first_y, first_m = month_range[0]
+    start = date(first_y, first_m, 1)
+    last_y, last_m = month_range[-1]
+    end = date(last_y + (1 if last_m == 12 else 0), 1 if last_m == 12 else last_m + 1, 1)
+
+    txns = (
+        db.query(BudgetTransaction)
+        .filter(
+            BudgetTransaction.user_id == user_id,
+            BudgetTransaction.amount < 0,
+            BudgetTransaction.is_investment == False,  # noqa: E712
+            BudgetTransaction.date >= start,
+            BudgetTransaction.date < end,
+        )
+        .all()
+    )
+
+    # Get category names + colors
+    cats = {
+        c.id: {"name": c.name, "color": c.color}
+        for c in db.query(Category)
+        .filter(Category.user_id == user_id)
+        .all()
+    }
+
+    # Aggregate by (month, category)
+    rate_cache: dict = {}
+    agg: dict[str, dict[str, float]] = {}  # month -> {cat_name: amount}
+    cat_totals: dict[str, float] = {}
+
+    for tx in txns:
+        month_key = _month_label(tx.date.year, tx.date.month)
+        amt = float(abs(
+            _convert_amount(db, Decimal(str(abs(tx.amount))), tx.currency, currency, tx.date, rate_cache)
+            .quantize(_QUANT_2, rounding=ROUND_HALF_UP)
+        ))
+        cat_info = cats.get(tx.category_id, {"name": "Uncategorized", "color": "#64748B"})
+        cat_name = cat_info["name"]
+
+        if month_key not in agg:
+            agg[month_key] = {}
+        agg[month_key][cat_name] = agg[month_key].get(cat_name, 0) + amt
+        cat_totals[cat_name] = cat_totals.get(cat_name, 0) + amt
+
+    # Pick top 8 categories by total spend
+    top_cats = sorted(cat_totals.keys(), key=lambda c: cat_totals[c], reverse=True)[:8]
+    cat_colors = {}
+    for cat in cats.values():
+        cat_colors[cat["name"]] = cat["color"]
+    cat_colors["Uncategorized"] = "#64748B"
+
+    # Build chart data
+    data = []
+    for y, m in month_range:
+        key = _month_label(y, m)
+        entry: dict = {"month": key}
+        month_data = agg.get(key, {})
+        for cat_name in top_cats:
+            entry[cat_name] = round(month_data.get(cat_name, 0), 2)
+        data.append(entry)
+
+    return {
+        "data": data,
+        "categories": [{"name": c, "color": cat_colors.get(c, "#64748B")} for c in top_cats],
+    }

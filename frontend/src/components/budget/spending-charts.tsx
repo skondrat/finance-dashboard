@@ -3,6 +3,7 @@
 import { CategoryDistributionChart } from "@/components/budget/charts/category-distribution";
 import { IncomeVsSpendChart } from "@/components/budget/charts/income-vs-spend";
 import { MonthComparison } from "@/components/budget/charts/month-comparison";
+import { SpendingTrendsChart } from "@/components/budget/charts/spending-trends";
 
 interface SpendingChartsProps {
   period?: string;
@@ -17,6 +18,7 @@ export function SpendingCharts({ period, month, year }: SpendingChartsProps) {
       {period === "monthly" && month && year && (
         <MonthComparison month={month} year={year} />
       )}
+      <SpendingTrendsChart />
       <IncomeVsSpendChart />
     </div>
   );
