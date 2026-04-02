@@ -83,6 +83,26 @@ export function useInvestmentRateTrend(months: number = 12) {
   });
 }
 
+export interface SpendingTrendsData {
+  data: Record<string, string | number>[];
+  categories: { name: string; color: string }[];
+}
+
+export function useSpendingTrends(months: number = 6) {
+  const currency = useCurrencyStore((s) => s.currency);
+
+  return useQuery<SpendingTrendsData>({
+    queryKey: ["budget", "charts", "spending-trends", months, currency],
+    queryFn: () => {
+      const params = new URLSearchParams({ months: String(months) });
+      if (currency) params.set("currency", currency);
+      return apiFetch<SpendingTrendsData>(
+        `/budget/charts/spending-trends?${params.toString()}`
+      );
+    },
+  });
+}
+
 export function useCategoryDistribution(
   period: string = "monthly",
   month?: number,
