@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import {
   sankey,
   sankeyLinkHorizontal,
@@ -57,7 +57,11 @@ function getNodeColor(node: NodeDatum, typeIndex: number): string {
   }
 }
 
-function getLinkColor(targetType: string): string {
+function getLinkColor(targetType: string, highlighted: boolean): string {
+  if (highlighted) {
+    if (targetType === "savings") return "rgba(0, 150, 104, 0.45)";
+    return "rgba(160, 160, 160, 0.35)";
+  }
   if (targetType === "savings") return "rgba(0, 150, 104, 0.15)";
   return "rgba(128, 128, 128, 0.12)";
 }
@@ -78,6 +82,14 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
   const { data, isLoading } = useCashflowSankey(year, month);
   const currency = useCurrencyStore((s) => s.currency);
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
+  // Zoom & pan state
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const width = 1000;
   const height = 600;
@@ -119,15 +131,36 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
     return generator({ nodes, links });
   }, [data, width, height, margin.left, margin.right, margin.top, margin.bottom]);
 
+  // Build connected node set for hover highlighting
+  const connectedNodes = useMemo(() => {
+    if (!layout || !hoveredNodeId) return new Set<string>();
+    const connected = new Set<string>([hoveredNodeId]);
+    for (const link of layout.links) {
+      const src = (link.source as SNode).id;
+      const tgt = (link.target as SNode).id;
+      if (src === hoveredNodeId || tgt === hoveredNodeId) {
+        connected.add(src);
+        connected.add(tgt);
+      }
+    }
+    return connected;
+  }, [layout, hoveredNodeId]);
+
+  const isLinkHighlighted = useCallback(
+    (link: SLink) => {
+      if (!hoveredNodeId) return false;
+      const src = (link.source as SNode).id;
+      const tgt = (link.target as SNode).id;
+      return src === hoveredNodeId || tgt === hoveredNodeId;
+    },
+    [hoveredNodeId]
+  );
+
   const handleNodeHover = useCallback(
     (node: SNode, event: React.MouseEvent) => {
       const value = (node.value as number) ?? 0;
-      setTooltip({
-        label: node.label,
-        value,
-        x: event.clientX,
-        y: event.clientY,
-      });
+      setTooltip({ label: node.label, value, x: event.clientX, y: event.clientY });
+      setHoveredNodeId(node.id);
     },
     []
   );
@@ -148,7 +181,42 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
 
   const handleMouseLeave = useCallback(() => {
     setTooltip(null);
+    setHoveredNodeId(null);
   }, []);
+
+  // Zoom with mouse wheel
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    setZoom((z) => {
+      const next = z * (e.deltaY < 0 ? 1.1 : 0.9);
+      return Math.min(Math.max(next, 0.5), 4);
+    });
+  }, []);
+
+  // Pan with mouse drag
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    setIsPanning(true);
+    panStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+  }, [pan]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning) return;
+    const dx = e.clientX - panStart.current.x;
+    const dy = e.clientY - panStart.current.y;
+    setPan({ x: panStart.current.panX + dx, y: panStart.current.panY + dy });
+  }, [isPanning]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  const resetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  const isZoomed = zoom !== 1 || pan.x !== 0 || pan.y !== 0;
 
   if (isLoading) {
     return (
@@ -171,94 +239,125 @@ export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
   }
 
   const pathGenerator = sankeyLinkHorizontal<SNode, SLink>();
-
-  // Track color indices per type
   const typeCounters: Record<string, number> = {};
+  const hasHover = hoveredNodeId !== null;
 
   return (
     <div className="rounded-2xl bg-surface-container-low p-6">
-      <div className="relative">
+      <div className="relative overflow-hidden rounded-xl">
+        {/* Reset zoom button */}
+        {isZoomed && (
+          <button
+            onClick={resetView}
+            className="absolute top-3 right-3 z-10 rounded-lg bg-surface-container-lowest/80 backdrop-blur-sm px-3 py-1.5 font-mono text-xs text-on-surface-variant hover:bg-surface-container-high transition-colors"
+          >
+            Reset view
+          </button>
+        )}
+
         <svg
+          ref={svgRef}
           viewBox={`0 0 ${width} ${height}`}
           className="w-full h-auto"
-          onMouseLeave={handleMouseLeave}
+          style={{ cursor: isPanning ? "grabbing" : zoom > 1 ? "grab" : "default" }}
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={() => {
+            handleMouseLeave();
+            handleMouseUp();
+          }}
         >
-          {/* Links */}
-          {layout.links.map((link, i) => {
-            const targetNode = link.target as SNode;
-            const d = pathGenerator(link as SLink);
-            if (!d) return null;
+          <g
+            transform={`translate(${pan.x / (svgRef.current?.clientWidth ? svgRef.current.clientWidth / width : 1)}, ${pan.y / (svgRef.current?.clientHeight ? svgRef.current.clientHeight / height : 1)}) scale(${zoom})`}
+            style={{ transformOrigin: `${width / 2}px ${height / 2}px` }}
+          >
+            {/* Links */}
+            {layout.links.map((link, i) => {
+              const targetNode = link.target as SNode;
+              const d = pathGenerator(link as SLink);
+              if (!d) return null;
 
-            return (
-              <path
-                key={i}
-                d={d}
-                fill={getLinkColor(targetNode.type)}
-                stroke="none"
-                strokeWidth={0}
-                style={{
-                  fillOpacity: 1,
-                  strokeWidth: Math.max(1, link.width ?? 1),
-                }}
-                onMouseMove={(e) => handleLinkHover(link as SLink, e)}
-                onMouseLeave={handleMouseLeave}
-              >
-                <title>
-                  {(link.source as SNode).label} → {targetNode.label}:{" "}
-                  {formatCurrency(link.value, currency)}
-                </title>
-              </path>
-            );
-          })}
+              const highlighted = isLinkHighlighted(link as SLink);
+              const dimmed = hasHover && !highlighted;
 
-          {/* Nodes */}
-          {layout.nodes.map((node) => {
-            const nodeType = node.type ?? "expense";
-            const colorKey = node.id === "income" ? "income-merged" : nodeType;
-            typeCounters[colorKey] = (typeCounters[colorKey] ?? 0);
-            const colorIndex = typeCounters[colorKey]++;
-
-            const x0 = node.x0 ?? 0;
-            const x1 = node.x1 ?? 0;
-            const y0 = node.y0 ?? 0;
-            const y1 = node.y1 ?? 0;
-            const nodeHeight = y1 - y0;
-
-            if (nodeHeight < 1) return null;
-
-            const color = getNodeColor(node as NodeDatum, colorIndex);
-
-            // Label positioning: level 0 and 1 labels on left, level 2 and 3 on right
-            const level = (node as NodeDatum).level ?? 0;
-            const labelOnLeft = level <= 1;
-
-            return (
-              <g
-                key={node.id}
-                onMouseMove={(e) => handleNodeHover(node as SNode, e)}
-                onMouseLeave={handleMouseLeave}
-              >
-                <rect
-                  x={x0}
-                  y={y0}
-                  width={x1 - x0}
-                  height={nodeHeight}
-                  fill={color}
-                  rx={2}
-                />
-                <text
-                  x={labelOnLeft ? x0 - 8 : x1 + 8}
-                  y={(y0 + y1) / 2}
-                  textAnchor={labelOnLeft ? "end" : "start"}
-                  dominantBaseline="central"
-                  className="font-mono text-xs fill-on-surface-variant"
-                  style={{ fontSize: 11, fontFamily: "var(--font-mono)" }}
+              return (
+                <path
+                  key={i}
+                  d={d}
+                  fill={getLinkColor(targetNode.type, highlighted)}
+                  stroke="none"
+                  strokeWidth={0}
+                  style={{
+                    fillOpacity: dimmed ? 0.3 : 1,
+                    strokeWidth: Math.max(1, link.width ?? 1),
+                    transition: "fill-opacity 0.2s, fill 0.2s",
+                  }}
+                  onMouseMove={(e) => handleLinkHover(link as SLink, e)}
+                  onMouseLeave={handleMouseLeave}
                 >
-                  {node.label}
-                </text>
-              </g>
-            );
-          })}
+                  <title>
+                    {(link.source as SNode).label} → {targetNode.label}:{" "}
+                    {formatCurrency(link.value, currency)}
+                  </title>
+                </path>
+              );
+            })}
+
+            {/* Nodes */}
+            {layout.nodes.map((node) => {
+              const nodeType = node.type ?? "expense";
+              const colorKey = node.id === "income" ? "income-merged" : nodeType;
+              typeCounters[colorKey] = typeCounters[colorKey] ?? 0;
+              const colorIndex = typeCounters[colorKey]++;
+
+              const x0 = node.x0 ?? 0;
+              const x1 = node.x1 ?? 0;
+              const y0 = node.y0 ?? 0;
+              const y1 = node.y1 ?? 0;
+              const nodeHeight = y1 - y0;
+
+              if (nodeHeight < 1) return null;
+
+              const color = getNodeColor(node as NodeDatum, colorIndex);
+              const level = (node as NodeDatum).level ?? 0;
+              const labelOnLeft = level <= 1;
+              const dimmed = hasHover && !connectedNodes.has(node.id);
+
+              return (
+                <g
+                  key={node.id}
+                  style={{
+                    opacity: dimmed ? 0.25 : 1,
+                    transition: "opacity 0.2s",
+                    cursor: "pointer",
+                  }}
+                  onMouseMove={(e) => handleNodeHover(node as SNode, e)}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  <rect
+                    x={x0}
+                    y={y0}
+                    width={x1 - x0}
+                    height={nodeHeight}
+                    fill={color}
+                    rx={2}
+                  />
+                  <text
+                    x={labelOnLeft ? x0 - 8 : x1 + 8}
+                    y={(y0 + y1) / 2}
+                    textAnchor={labelOnLeft ? "end" : "start"}
+                    dominantBaseline="central"
+                    className="font-mono text-xs fill-on-surface-variant"
+                    style={{ fontSize: 11, fontFamily: "var(--font-mono)" }}
+                  >
+                    {node.label}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
         </svg>
 
         {/* Glassmorphism tooltip */}
