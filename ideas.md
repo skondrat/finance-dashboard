@@ -6,7 +6,7 @@
 
 ### ~~Lefside should show Income source -> Income bar -> Major categories -> Final categories~~ (DONE - PR #45)
 
-### Should be more interactive, maybe with ability to zoom in zoom out
+### ~~Should be more interactive, maybe with ability to zoom in zoom out~~ (DONE - PR #46)
 
 ### Should be colorful, like in Budget categories.
 
