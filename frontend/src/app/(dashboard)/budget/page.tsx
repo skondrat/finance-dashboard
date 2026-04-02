@@ -172,7 +172,15 @@ export default function BudgetPage() {
           </div>
           <IncomeManager year={summaryYear} month={summaryMonth} />
 
-          <SpendingCharts period={period} month={summaryMonth} year={summaryYear} />
+          <SpendingCharts
+            period={period}
+            month={summaryMonth}
+            year={summaryYear}
+            onCategoryClick={(categoryId) => {
+              setTxCategoryFilter(categoryId);
+              document.getElementById("transaction-list")?.scrollIntoView({ behavior: "smooth" });
+            }}
+          />
 
           <DebugMenu />
         </div>

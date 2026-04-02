@@ -9,12 +9,13 @@ interface SpendingChartsProps {
   period?: string;
   month?: number;
   year?: number;
+  onCategoryClick?: (categoryId: string) => void;
 }
 
-export function SpendingCharts({ period, month, year }: SpendingChartsProps) {
+export function SpendingCharts({ period, month, year, onCategoryClick }: SpendingChartsProps) {
   return (
     <div className="space-y-6">
-      <CategoryDistributionChart period={period} month={month} year={year} />
+      <CategoryDistributionChart period={period} month={month} year={year} onCategoryClick={onCategoryClick} />
       {period === "monthly" && month && year && (
         <MonthComparison month={month} year={year} />
       )}

@@ -305,7 +305,7 @@ export function TransactionList({
                 </span>
 
                 {/* Description */}
-                <span className="font-body text-sm text-on-surface truncate">
+                <span className="font-body text-sm text-on-surface truncate" title={tx.description}>
                   {tx.description}
                 </span>
 
