@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apiFetch, setAccessToken } from "@/lib/api";
+import { apiFetch, setAccessToken, REFRESH_TOKEN_KEY } from "@/lib/api";
 
 interface AuthUser {
   id: string;
@@ -24,8 +24,6 @@ interface AuthState {
   refresh: () => Promise<boolean>;
   initialize: () => Promise<void>;
 }
-
-const REFRESH_TOKEN_KEY = "finance_refresh_token";
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
