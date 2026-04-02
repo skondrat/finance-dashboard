@@ -9,6 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.budget_transaction import BudgetTransaction
+from app.models.category import Category
 from app.models.subscription import DismissedSuggestion, Subscription
 
 
@@ -88,6 +89,101 @@ def detect_recurring(db: Session, user_id: str) -> list[dict]:
         filtered.append(s)
 
     return sorted(filtered, key=lambda s: s["months_detected"], reverse=True)
+
+
+def sync_from_budget(db: Session, user_id: str) -> list[dict]:
+    """Auto-create subscriptions from budget transactions categorized as 'Subscriptions'.
+
+    Groups transactions by description, determines cadence from frequency,
+    and creates subscription entries for any that don't already exist.
+    Returns list of newly created subscriptions.
+    """
+    # Find the "Subscriptions" category
+    sub_cat = (
+        db.query(Category)
+        .filter(Category.user_id == user_id, func.lower(Category.name) == "subscriptions")
+        .first()
+    )
+    if not sub_cat:
+        return []
+
+    # Get all transactions in this category
+    rows = (
+        db.query(
+            func.lower(BudgetTransaction.description).label("desc_lower"),
+            BudgetTransaction.description,
+            func.strftime("%Y-%m", BudgetTransaction.date).label("month"),
+            BudgetTransaction.amount,
+            BudgetTransaction.currency,
+            BudgetTransaction.date,
+        )
+        .filter(
+            BudgetTransaction.user_id == user_id,
+            BudgetTransaction.category_id == sub_cat.id,
+            BudgetTransaction.amount < 0,
+        )
+        .order_by(BudgetTransaction.date.asc())
+        .all()
+    )
+
+    if not rows:
+        return []
+
+    # Group by description
+    by_desc: dict[str, list] = defaultdict(list)
+    for row in rows:
+        by_desc[row.desc_lower].append({
+            "description": row.description,
+            "month": row.month,
+            "amount": float(abs(row.amount)),
+            "currency": row.currency,
+            "date": row.date,
+        })
+
+    # Get existing subscription names
+    existing_names = {
+        s.name.lower()
+        for s in db.query(Subscription.name).filter(Subscription.user_id == user_id).all()
+    }
+
+    created = []
+    for desc, occurrences in by_desc.items():
+        if desc in existing_names:
+            continue
+
+        months = sorted(set(o["month"] for o in occurrences))
+        latest = max(occurrences, key=lambda o: o["date"])
+
+        # Determine cadence: if appears 2+ months with gaps ~12 months → yearly, else monthly
+        cadence = "monthly"
+        if len(months) >= 2:
+            consecutive = _count_consecutive_months(months)
+            if consecutive < 2:
+                # Check if roughly yearly (gaps of ~11-13 months)
+                cadence = "yearly"
+        elif len(months) == 1:
+            cadence = "monthly"  # default assumption
+
+        sub = Subscription(
+            user_id=user_id,
+            name=latest["description"],
+            cadence=cadence,
+            amount=latest["amount"],
+            currency=latest["currency"],
+            payment_day=latest["date"].day if latest["date"] else None,
+        )
+        db.add(sub)
+        created.append({
+            "name": sub.name,
+            "amount": sub.amount,
+            "currency": sub.currency,
+            "cadence": sub.cadence,
+        })
+
+    if created:
+        db.commit()
+
+    return created
 
 
 def _count_consecutive_months(months: list[str]) -> int:

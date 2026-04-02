@@ -98,6 +98,19 @@ export function useDeleteSubscription() {
   });
 }
 
+export function useSyncSubscriptionsFromBudget() {
+  const qc = useQueryClient();
+  return useMutation<{ created: unknown[]; count: number }, Error, void>({
+    mutationFn: () =>
+      apiFetch("/subscriptions/sync-from-budget", { method: "POST" }),
+    onSuccess: (data) => {
+      if (data.count > 0) {
+        qc.invalidateQueries({ queryKey: ["subscriptions"] });
+      }
+    },
+  });
+}
+
 export function useSubscriptionSuggestions(enabled: boolean) {
   return useQuery<{ suggestions: SubscriptionSuggestion[] }>({
     queryKey: ["subscriptions", "suggestions"],

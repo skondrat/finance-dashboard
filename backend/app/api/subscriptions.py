@@ -166,6 +166,20 @@ def delete_subscription(
 
 
 # ---------------------------------------------------------------------------
+# Sync from budget (auto-create from "Subscriptions" category)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/sync-from-budget")
+def sync_from_budget(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    created = subscription_service.sync_from_budget(db, user_id)
+    return {"created": created, "count": len(created)}
+
+
+# ---------------------------------------------------------------------------
 # Suggestions (auto-detection)
 # ---------------------------------------------------------------------------
 
