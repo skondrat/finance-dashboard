@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import {
   PieChart,
   Pie,
@@ -72,6 +72,7 @@ export function CategoryDistributionChart({
 }: CategoryDistributionChartProps) {
   const { data, isLoading } = useCategoryDistribution(period, month, year);
   const currency = useCurrencyStore((s) => s.currency);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const chartData = data?.categories.map((cat, idx) => ({
     ...cat,
@@ -106,11 +107,21 @@ export function CategoryDistributionChart({
                 outerRadius={100}
                 paddingAngle={2}
                 strokeWidth={0}
+                onMouseEnter={(_, idx) => setActiveIndex(idx)}
+                onMouseLeave={() => setActiveIndex(null)}
               >
                 {chartData.map((entry, idx) => (
                   <Cell
                     key={entry.category_id ?? idx}
                     fill={entry.fill}
+                    opacity={activeIndex === null || activeIndex === idx ? 1 : 0.4}
+                    stroke={activeIndex === idx ? entry.fill : "none"}
+                    strokeWidth={activeIndex === idx ? 3 : 0}
+                    style={{
+                      transition: "opacity 150ms, transform 150ms",
+                      filter: activeIndex === idx ? "brightness(1.15)" : "none",
+                      cursor: "pointer",
+                    }}
                   />
                 ))}
               </Pie>
@@ -154,7 +165,16 @@ export function CategoryDistributionChart({
       {data && chartData.length > 0 && (
         <div className="mt-4 grid grid-cols-2 gap-2">
           {chartData.slice(0, 8).map((entry, idx) => (
-            <div key={entry.category_id ?? idx} className="flex items-center gap-2">
+            <div
+              key={entry.category_id ?? idx}
+              className="flex items-center gap-2 cursor-pointer rounded px-1 py-0.5 transition-all duration-150"
+              style={{
+                opacity: activeIndex === null || activeIndex === idx ? 1 : 0.4,
+                backgroundColor: activeIndex === idx ? `${entry.fill}15` : "transparent",
+              }}
+              onMouseEnter={() => setActiveIndex(idx)}
+              onMouseLeave={() => setActiveIndex(null)}
+            >
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
                 style={{ backgroundColor: entry.fill }}
