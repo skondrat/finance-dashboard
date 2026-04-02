@@ -98,6 +98,22 @@ def sync_from_budget(db: Session, user_id: str) -> list[dict]:
     and creates subscription entries for any that don't already exist.
     Returns list of newly created subscriptions.
     """
+    # Remove duplicate subscriptions (keep the most recently updated one per name)
+    all_subs = (
+        db.query(Subscription)
+        .filter(Subscription.user_id == user_id)
+        .order_by(Subscription.updated_at.desc())
+        .all()
+    )
+    seen: dict[str, str] = {}  # lowercase name -> id to keep
+    for sub in all_subs:
+        key = sub.name.lower().strip()
+        if key in seen:
+            db.delete(sub)
+        else:
+            seen[key] = sub.id
+    db.flush()
+
     # Find the "Subscriptions" category
     sub_cat = (
         db.query(Category)
