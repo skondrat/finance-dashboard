@@ -17,6 +17,7 @@ from app.database import get_db
 from app.models.budget_transaction import BudgetTransaction
 from app.models.category import Category
 from app.models.income_source import IncomeSource
+from app.services.budget_service import _convert_amount
 
 router = APIRouter(prefix="/api/v1", tags=["budget-charts"])
 
@@ -60,38 +61,35 @@ def income_vs_spend(
     """Monthly income vs spend data for grouped bar chart."""
     month_list = _month_range(months)
 
-    # Aggregate income by year/month
+    # Aggregate income by year/month with currency conversion
     income_rows = (
-        db.query(
-            IncomeSource.year,
-            IncomeSource.month,
-            func.coalesce(func.sum(IncomeSource.amount), 0).label("total"),
-        )
-        .filter(
-            IncomeSource.user_id == user_id,
-            IncomeSource.currency == currency,
-        )
-        .group_by(IncomeSource.year, IncomeSource.month)
+        db.query(IncomeSource)
+        .filter(IncomeSource.user_id == user_id)
         .all()
     )
-    income_map = {(r.year, r.month): Decimal(str(r.total)) for r in income_rows}
+    rate_cache: dict = {}
+    income_map: dict[tuple[int, int], Decimal] = {}
+    for r in income_rows:
+        amt = Decimal(str(r.amount))
+        converted = _convert_amount(db, amt, r.currency, currency, date(r.year, r.month, 1), rate_cache)
+        key = (r.year, r.month)
+        income_map[key] = income_map.get(key, _ZERO) + converted
 
-    # Aggregate spend (negative transactions) by year/month
-    spend_rows = (
-        db.query(
-            extract("year", BudgetTransaction.date).label("yr"),
-            extract("month", BudgetTransaction.date).label("mo"),
-            func.coalesce(func.sum(BudgetTransaction.amount), 0).label("total"),
-        )
+    # Aggregate spend (negative transactions) by year/month with currency conversion
+    spend_txns = (
+        db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
-            BudgetTransaction.currency == currency,
             BudgetTransaction.amount < 0,
         )
-        .group_by("yr", "mo")
         .all()
     )
-    spend_map = {(int(r.yr), int(r.mo)): abs(Decimal(str(r.total))) for r in spend_rows}
+    spend_map: dict[tuple[int, int], Decimal] = {}
+    for tx in spend_txns:
+        amt = abs(Decimal(str(tx.amount)))
+        converted = _convert_amount(db, amt, tx.currency, currency, tx.date, rate_cache)
+        key = (tx.date.year, tx.date.month)
+        spend_map[key] = spend_map.get(key, _ZERO) + converted
 
     data = []
     for y, m in month_list:
@@ -123,38 +121,35 @@ def savings_over_time(
     """Monthly savings = income - spend, over time."""
     month_list = _month_range(months)
 
-    # Income by month
+    # Income by month with currency conversion
     income_rows = (
-        db.query(
-            IncomeSource.year,
-            IncomeSource.month,
-            func.coalesce(func.sum(IncomeSource.amount), 0).label("total"),
-        )
-        .filter(
-            IncomeSource.user_id == user_id,
-            IncomeSource.currency == currency,
-        )
-        .group_by(IncomeSource.year, IncomeSource.month)
+        db.query(IncomeSource)
+        .filter(IncomeSource.user_id == user_id)
         .all()
     )
-    income_map = {(r.year, r.month): Decimal(str(r.total)) for r in income_rows}
+    rate_cache: dict = {}
+    income_map: dict[tuple[int, int], Decimal] = {}
+    for r in income_rows:
+        amt = Decimal(str(r.amount))
+        converted = _convert_amount(db, amt, r.currency, currency, date(r.year, r.month, 1), rate_cache)
+        key = (r.year, r.month)
+        income_map[key] = income_map.get(key, _ZERO) + converted
 
-    # Spend by month
-    spend_rows = (
-        db.query(
-            extract("year", BudgetTransaction.date).label("yr"),
-            extract("month", BudgetTransaction.date).label("mo"),
-            func.coalesce(func.sum(BudgetTransaction.amount), 0).label("total"),
-        )
+    # Spend by month with currency conversion
+    spend_txns = (
+        db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
-            BudgetTransaction.currency == currency,
             BudgetTransaction.amount < 0,
         )
-        .group_by("yr", "mo")
         .all()
     )
-    spend_map = {(int(r.yr), int(r.mo)): abs(Decimal(str(r.total))) for r in spend_rows}
+    spend_map: dict[tuple[int, int], Decimal] = {}
+    for tx in spend_txns:
+        amt = abs(Decimal(str(tx.amount)))
+        converted = _convert_amount(db, amt, tx.currency, currency, tx.date, rate_cache)
+        key = (tx.date.year, tx.date.month)
+        spend_map[key] = spend_map.get(key, _ZERO) + converted
 
     data = []
     cumulative = _ZERO
@@ -189,39 +184,36 @@ def investment_rate_trend(
     """Monthly investment rate % = investment spend / income * 100."""
     month_list = _month_range(months)
 
-    # Income by month
+    # Income by month with currency conversion
     income_rows = (
-        db.query(
-            IncomeSource.year,
-            IncomeSource.month,
-            func.coalesce(func.sum(IncomeSource.amount), 0).label("total"),
-        )
-        .filter(
-            IncomeSource.user_id == user_id,
-            IncomeSource.currency == currency,
-        )
-        .group_by(IncomeSource.year, IncomeSource.month)
+        db.query(IncomeSource)
+        .filter(IncomeSource.user_id == user_id)
         .all()
     )
-    income_map = {(r.year, r.month): Decimal(str(r.total)) for r in income_rows}
+    rate_cache: dict = {}
+    income_map: dict[tuple[int, int], Decimal] = {}
+    for r in income_rows:
+        amt = Decimal(str(r.amount))
+        converted = _convert_amount(db, amt, r.currency, currency, date(r.year, r.month, 1), rate_cache)
+        key = (r.year, r.month)
+        income_map[key] = income_map.get(key, _ZERO) + converted
 
-    # Investment spend by month
-    inv_rows = (
-        db.query(
-            extract("year", BudgetTransaction.date).label("yr"),
-            extract("month", BudgetTransaction.date).label("mo"),
-            func.coalesce(func.sum(BudgetTransaction.amount), 0).label("total"),
-        )
+    # Investment spend by month with currency conversion
+    inv_txns = (
+        db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
-            BudgetTransaction.currency == currency,
             BudgetTransaction.amount < 0,
             BudgetTransaction.is_investment == True,  # noqa: E712
         )
-        .group_by("yr", "mo")
         .all()
     )
-    inv_map = {(int(r.yr), int(r.mo)): abs(Decimal(str(r.total))) for r in inv_rows}
+    inv_map: dict[tuple[int, int], Decimal] = {}
+    for tx in inv_txns:
+        amt = abs(Decimal(str(tx.amount)))
+        converted = _convert_amount(db, amt, tx.currency, currency, tx.date, rate_cache)
+        key = (tx.date.year, tx.date.month)
+        inv_map[key] = inv_map.get(key, _ZERO) + converted
 
     data = []
     for y, m in month_list:
@@ -282,25 +274,27 @@ def category_distribution(
             else date(today.year, today.month + 1, 1)
         )
 
-    # Aggregate spend by category
-    spend_rows = (
-        db.query(
-            BudgetTransaction.category_id,
-            func.sum(BudgetTransaction.amount).label("total"),
-        )
+    # Fetch all spend transactions (any currency) and convert to target currency
+    spend_txns = (
+        db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
-            BudgetTransaction.currency == currency,
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.amount < 0,
         )
-        .group_by(BudgetTransaction.category_id)
         .all()
     )
 
+    rate_cache: dict = {}
+    spend_map: dict[str | None, Decimal] = {}
+    for tx in spend_txns:
+        amt = abs(Decimal(str(tx.amount)))
+        converted = _convert_amount(db, amt, tx.currency, currency, tx.date, rate_cache)
+        spend_map[tx.category_id] = spend_map.get(tx.category_id, _ZERO) + converted
+
     # Fetch category names and colors
-    category_ids = [r.category_id for r in spend_rows if r.category_id is not None]
+    category_ids = [cid for cid in spend_map if cid is not None]
     cat_map: dict[str, tuple[str, str]] = {}
     if category_ids:
         cats = (
@@ -310,9 +304,7 @@ def category_distribution(
         )
         cat_map = {c.id: (c.name, c.color) for c in cats}
 
-    total_spend = sum(
-        abs(Decimal(str(r.total))) for r in spend_rows
-    )
+    total_spend = sum(spend_map.values(), _ZERO)
 
     # Monochromatic palette for categories without a stored color
     gray_palette = [
@@ -321,9 +313,7 @@ def category_distribution(
     ]
 
     data = []
-    for idx, row in enumerate(spend_rows):
-        cat_id = row.category_id
-        amount = abs(Decimal(str(row.total)))
+    for idx, (cat_id, amount) in enumerate(spend_map.items()):
         if cat_id and cat_id in cat_map:
             name, color = cat_map[cat_id]
         else:
