@@ -155,22 +155,25 @@ def get_cashflow_sankey(
     )
     investment_total = abs(Decimal(str(investment_total_raw))) if investment_total_raw else _ZERO
 
-    # ── Resolve category names ─────────────────────────────────────────────
+    # ── Resolve category names and colors ─────────────────────────────────
     category_ids = [r.category_id for r in spend_rows if r.category_id is not None]
     cat_map: dict[str | None, str] = {}
+    cat_color_map: dict[str | None, str] = {}
     if category_ids:
-        cats = db.query(Category.id, Category.name).filter(Category.id.in_(category_ids)).all()
+        cats = db.query(Category.id, Category.name, Category.color).filter(Category.id.in_(category_ids)).all()
         cat_map = {c.id: c.name for c in cats}
+        cat_color_map = {c.id: c.color for c in cats}
 
-    # (node_id, cat_name, amount, major_group)
-    expense_entries: list[tuple[str, str, Decimal, str]] = []
+    # (node_id, cat_name, amount, major_group, color)
+    expense_entries: list[tuple[str, str, Decimal, str, str]] = []
     for row in spend_rows:
         cat_id = row.category_id
         cat_name = cat_map.get(cat_id, "Uncategorized") if cat_id else "Uncategorized"
+        cat_color = cat_color_map.get(cat_id, "#6b7280") if cat_id else "#6b7280"
         node_id = f"final-{cat_id}" if cat_id else "final-uncategorized"
         amount = abs(Decimal(str(row.total)))
         major = MAJOR_CATEGORY_MAP.get(cat_name, "Other")
-        expense_entries.append((node_id, cat_name, amount, major))
+        expense_entries.append((node_id, cat_name, amount, major, cat_color))
 
     total_spend = sum((e[2] for e in expense_entries), _ZERO)
     savings = max(total_income - total_spend - investment_total, _ZERO)
@@ -198,9 +201,14 @@ def get_cashflow_sankey(
         })
 
     # Level 2: Major category nodes (+ Savings, Investments)
+    # Track totals and largest child color per major group
     major_totals: dict[str, Decimal] = {}
-    for _nid, _cname, amount, major in expense_entries:
+    major_top_color: dict[str, tuple[Decimal, str]] = {}
+    for _nid, _cname, amount, major, color in expense_entries:
         major_totals[major] = major_totals.get(major, _ZERO) + amount
+        prev = major_top_color.get(major)
+        if prev is None or amount > prev[0]:
+            major_top_color[major] = (amount, color)
 
     for major_name in sorted(major_totals.keys()):
         nodes.append({
@@ -208,6 +216,7 @@ def get_cashflow_sankey(
             "label": major_name,
             "type": "major",
             "level": 2,
+            "color": major_top_color[major_name][1],
         })
 
     if savings > _ZERO:
@@ -227,12 +236,13 @@ def get_cashflow_sankey(
         })
 
     # Level 3: Final expense category nodes
-    for node_id, cat_name, _amount, _major in expense_entries:
+    for node_id, cat_name, _amount, _major, color in expense_entries:
         nodes.append({
             "id": node_id,
             "label": cat_name,
             "type": "expense",
             "level": 3,
+            "color": color,
         })
 
     # ── Build links ────────────────────────────────────────────────────────
@@ -273,7 +283,7 @@ def get_cashflow_sankey(
             })
 
     # Level 2 → 3: Major categories → Final categories
-    for node_id, _cat_name, amount, major in expense_entries:
+    for node_id, _cat_name, amount, major, _color in expense_entries:
         if amount > _ZERO:
             links.append({
                 "source": f"major-{major}",
