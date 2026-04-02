@@ -416,7 +416,17 @@ def confirm_import(
     splits = None
     if payload and payload.splits:
         splits = [s.model_dump() for s in payload.splits]
-    return import_service.confirm_import(db, stmt_import, category_overrides=category_overrides, splits=splits)
+    excluded_rows = payload.excluded_rows if payload else None
+    amount_overrides = None
+    if payload and payload.amount_overrides:
+        amount_overrides = [o.model_dump() for o in payload.amount_overrides]
+    return import_service.confirm_import(
+        db, stmt_import,
+        category_overrides=category_overrides,
+        splits=splits,
+        excluded_rows=excluded_rows,
+        amount_overrides=amount_overrides,
+    )
 
 
 # ---------------------------------------------------------------------------
