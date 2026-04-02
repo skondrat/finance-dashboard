@@ -56,8 +56,13 @@ interface TooltipData {
   y: number;
 }
 
-export function SankeyDiagram() {
-  const { data, isLoading } = useCashflowSankey();
+interface SankeyDiagramProps {
+  year: number;
+  month: number;
+}
+
+export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
+  const { data, isLoading } = useCashflowSankey(year, month);
   const currency = useCurrencyStore((s) => s.currency);
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
@@ -135,9 +140,6 @@ export function SankeyDiagram() {
   if (isLoading) {
     return (
       <div className="rounded-2xl bg-surface-container-low p-6">
-        <h2 className="font-display text-xl font-medium text-on-surface mb-6">
-          Cashflow
-        </h2>
         <div className="h-[500px] animate-pulse rounded-xl bg-surface-container-lowest" />
       </div>
     );
@@ -146,12 +148,9 @@ export function SankeyDiagram() {
   if (!data || !layout) {
     return (
       <div className="rounded-2xl bg-surface-container-low p-6">
-        <h2 className="font-display text-xl font-medium text-on-surface mb-6">
-          Cashflow
-        </h2>
         <div className="flex h-[500px] items-center justify-center">
           <p className="font-mono text-sm text-on-surface-variant">
-            No cashflow data for last month
+            No cashflow data for this month
           </p>
         </div>
       </div>
@@ -164,15 +163,6 @@ export function SankeyDiagram() {
 
   return (
     <div className="rounded-2xl bg-surface-container-low p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="font-display text-xl font-medium text-on-surface">
-          Cashflow
-        </h2>
-        <p className="font-mono text-xs text-on-surface-variant">
-          {data.month}
-        </p>
-      </div>
-
       <div className="relative">
         <svg
           viewBox={`0 0 ${width} ${height}`}

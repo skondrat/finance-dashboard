@@ -39,8 +39,13 @@ function KpiCard({ label, value, large, colorClass }: KpiCardProps) {
   );
 }
 
-export function CashflowKpiStrip() {
-  const { data, isLoading } = useCashflowSankey();
+interface CashflowKpiStripProps {
+  year: number;
+  month: number;
+}
+
+export function CashflowKpiStrip({ year, month }: CashflowKpiStripProps) {
+  const { data, isLoading } = useCashflowSankey(year, month);
   const currency = useCurrencyStore((s) => s.currency);
 
   if (isLoading || !data) {
