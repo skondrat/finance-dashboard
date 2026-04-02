@@ -63,12 +63,14 @@ interface CategoryDistributionChartProps {
   period?: string;
   month?: number;
   year?: number;
+  onCategoryClick?: (categoryId: string) => void;
 }
 
 export function CategoryDistributionChart({
   period = "monthly",
   month,
   year,
+  onCategoryClick,
 }: CategoryDistributionChartProps) {
   const { data, isLoading } = useCategoryDistribution(period, month, year);
   const currency = useCurrencyStore((s) => s.currency);
@@ -109,6 +111,10 @@ export function CategoryDistributionChart({
                 strokeWidth={0}
                 onMouseEnter={(_, idx) => setActiveIndex(idx)}
                 onMouseLeave={() => setActiveIndex(null)}
+                onClick={(_, idx) => {
+                  const cat = chartData[idx];
+                  if (cat?.category_id && onCategoryClick) onCategoryClick(cat.category_id);
+                }}
               >
                 {chartData.map((entry, idx) => (
                   <Cell
@@ -174,6 +180,9 @@ export function CategoryDistributionChart({
               }}
               onMouseEnter={() => setActiveIndex(idx)}
               onMouseLeave={() => setActiveIndex(null)}
+              onClick={() => {
+                if (entry.category_id && onCategoryClick) onCategoryClick(entry.category_id);
+              }}
             >
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
