@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   useSubscriptions,
   useCancelSubscription,
@@ -8,6 +9,9 @@ import {
   type Subscription,
 } from "@/lib/queries/subscriptions";
 import { formatCurrency } from "@/lib/utils";
+
+type SortField = "name" | "price";
+type SortDir = "asc" | "desc";
 
 function monthlyEquivalent(sub: Subscription): number {
   if (sub.cadence === "yearly") return sub.amount / 12;
@@ -25,19 +29,39 @@ interface Props {
   onEdit: (sub: Subscription) => void;
 }
 
+function sortSubs(subs: Subscription[], field: SortField, dir: SortDir): Subscription[] {
+  return [...subs].sort((a, b) => {
+    const cmp = field === "price"
+      ? monthlyEquivalent(a) - monthlyEquivalent(b)
+      : a.name.localeCompare(b.name);
+    return dir === "asc" ? cmp : -cmp;
+  });
+}
+
 export function SubscriptionList({ onEdit }: Props) {
   const { data: subscriptions, isLoading } = useSubscriptions();
   const cancelMutation = useCancelSubscription();
   const reactivateMutation = useReactivateSubscription();
   const deleteMutation = useDeleteSubscription();
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function toggleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir(field === "price" ? "desc" : "asc");
+    }
+  }
 
   if (isLoading) {
     return <div className="h-40 animate-pulse rounded-xl bg-surface-container-lowest" />;
   }
 
   const all = subscriptions ?? [];
-  const active = all.filter((s) => s.status === "active");
-  const cancelled = all.filter((s) => s.status === "cancelled");
+  const active = sortSubs(all.filter((s) => s.status === "active"), sortField, sortDir);
+  const cancelled = sortSubs(all.filter((s) => s.status === "cancelled"), sortField, sortDir);
 
   const totalMonthly = active.reduce((sum, s) => sum + monthlyEquivalent(s), 0);
 
@@ -56,9 +80,25 @@ export function SubscriptionList({ onEdit }: Props) {
       {/* Active subscriptions */}
       {active.length > 0 && (
         <div className="rounded-2xl bg-surface-container-lowest p-6">
-          <h3 className="font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant mb-4">
-            Active ({active.length})
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant">
+              Active ({active.length})
+            </h3>
+            <div className="flex gap-1">
+              <button
+                onClick={() => toggleSort("name")}
+                className={`rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.05em] transition-colors cursor-pointer ${sortField === "name" ? "bg-on-surface-variant/15 text-on-surface" : "text-on-surface-variant hover:text-on-surface"}`}
+              >
+                Name {sortField === "name" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+              </button>
+              <button
+                onClick={() => toggleSort("price")}
+                className={`rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.05em] transition-colors cursor-pointer ${sortField === "price" ? "bg-on-surface-variant/15 text-on-surface" : "text-on-surface-variant hover:text-on-surface"}`}
+              >
+                Price {sortField === "price" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+              </button>
+            </div>
+          </div>
           <div className="space-y-2">
             {active.map((sub) => (
               <div
