@@ -13,7 +13,6 @@ export default function SubscriptionsPage() {
   const hasSynced = useRef(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editSub, setEditSub] = useState<Subscription | null>(null);
-  const [detectEnabled, setDetectEnabled] = useState(false);
 
   // Auto-sync subscriptions from budget "Subscriptions" category on page load
   useEffect(() => {
@@ -29,12 +28,6 @@ export default function SubscriptionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-end gap-2">
         <button
-          onClick={() => setDetectEnabled(true)}
-          className="rounded-xl bg-surface-container-high px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-on-surface transition-colors hover:bg-surface-container-highest cursor-pointer"
-        >
-          Detect
-        </button>
-        <button
           onClick={() => {
             setEditSub(null);
             setModalOpen(true);
@@ -45,7 +38,7 @@ export default function SubscriptionsPage() {
         </button>
       </div>
 
-      <SuggestionCards enabled={detectEnabled} />
+      <SuggestionCards enabled={true} />
 
       {!isLoading && !hasSubscriptions ? (
         <EmptyState
