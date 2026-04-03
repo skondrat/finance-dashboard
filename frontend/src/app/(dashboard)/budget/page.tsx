@@ -162,13 +162,7 @@ export default function BudgetPage() {
           <div className="flex items-center gap-2">
             <ImportModal />
             <AddSpendModal month={summaryMonth} year={summaryYear} />
-            <button
-              onClick={handleExport}
-              className="rounded-xl bg-surface-container-high px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-on-surface transition-colors hover:bg-surface-container-highest cursor-pointer"
-            >
-              Export CSV
-            </button>
-            <SettingsMenu />
+            <SettingsMenu onExport={handleExport} />
           </div>
           <IncomeManager year={summaryYear} month={summaryMonth} />
 
