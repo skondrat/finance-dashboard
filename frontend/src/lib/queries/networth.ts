@@ -65,8 +65,9 @@ export interface NetworthHistory {
   snapshots: NetworthSnapshot[];
 }
 
-export function useNetworthHistory() {
-  const currency = useCurrencyStore((s) => s.currency);
+export function useNetworthHistory(currencyOverride?: string) {
+  const storeCurrency = useCurrencyStore((s) => s.currency);
+  const currency = currencyOverride ?? storeCurrency;
 
   return useQuery<NetworthHistory>({
     queryKey: ["networth", "history", currency],

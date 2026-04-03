@@ -6,7 +6,6 @@ import {
   useUpdateSnapshot,
   type NetworthSnapshot,
 } from "@/lib/queries/networth";
-import { useCurrencyStore } from "@/stores/currency-store";
 import { formatCurrency, cn } from "@/lib/utils";
 
 interface EditSnapshotModalProps {
@@ -15,8 +14,7 @@ interface EditSnapshotModalProps {
 }
 
 export function EditSnapshotModal({ open, onClose }: EditSnapshotModalProps) {
-  const { data: history } = useNetworthHistory();
-  const currency = useCurrencyStore((s) => s.currency);
+  const { data: history } = useNetworthHistory("EUR");
   const mutation = useUpdateSnapshot();
 
   const snapshots = history?.snapshots ?? [];
@@ -159,7 +157,7 @@ export function EditSnapshotModal({ open, onClose }: EditSnapshotModalProps) {
           ) : (
             <div>
               <label className="block font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant mb-1.5">
-                Total Networth ({currency})
+                Total Networth (EUR)
               </label>
               <input
                 type="number"
@@ -178,7 +176,7 @@ export function EditSnapshotModal({ open, onClose }: EditSnapshotModalProps) {
                 Total
               </span>
               <span className="font-display text-lg font-medium text-on-surface">
-                {formatCurrency(liveTotal, currency)}
+                {formatCurrency(liveTotal, "EUR")}
               </span>
             </div>
           )}
