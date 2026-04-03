@@ -21,7 +21,11 @@ function GearIcon() {
   );
 }
 
-export function SettingsMenu() {
+interface SettingsMenuProps {
+  onExport?: () => void;
+}
+
+export function SettingsMenu({ onExport }: SettingsMenuProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -49,6 +53,17 @@ export function SettingsMenu() {
 
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] rounded-lg bg-surface-container-lowest border border-on-surface-variant/10 shadow-ambient py-1">
+          {onExport && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                onExport();
+              }}
+              className="w-full text-left px-3 py-2 font-mono text-xs uppercase tracking-[0.1em] text-on-surface hover:bg-surface-container-low transition-colors"
+            >
+              Export CSV
+            </button>
+          )}
           <button
             onClick={() => {
               setOpen(false);
