@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from sqlalchemy.orm import joinedload
+
 from app.api.deps import get_current_user_id
 from app.database import get_db
 from app.models.budget_transaction import BudgetTransaction
@@ -43,24 +45,49 @@ def list_subscriptions(
         .all()
     )
 
-    # Find latest transaction date per subscription name
+    # Find latest transaction date and source per subscription name
     if subs:
         sub_names = [s.name for s in subs]
-        latest_dates = (
+        lower_names = [n.lower() for n in sub_names]
+
+        # Subquery: max date per description
+        max_date_sub = (
             db.query(
-                func.lower(BudgetTransaction.description),
-                func.max(BudgetTransaction.date),
+                func.lower(BudgetTransaction.description).label("desc_lower"),
+                func.max(BudgetTransaction.date).label("max_date"),
             )
             .filter(
                 BudgetTransaction.user_id == user_id,
-                func.lower(BudgetTransaction.description).in_([n.lower() for n in sub_names]),
+                func.lower(BudgetTransaction.description).in_(lower_names),
             )
+            .group_by(func.lower(BudgetTransaction.description))
+            .subquery()
+        )
+
+        # Join back to get the source from the latest transaction
+        latest_rows = (
+            db.query(
+                func.lower(BudgetTransaction.description).label("desc_lower"),
+                max_date_sub.c.max_date,
+                StatementImport.source,
+            )
+            .join(
+                max_date_sub,
+                (func.lower(BudgetTransaction.description) == max_date_sub.c.desc_lower)
+                & (BudgetTransaction.date == max_date_sub.c.max_date),
+            )
+            .outerjoin(StatementImport, BudgetTransaction.import_id == StatementImport.id)
+            .filter(BudgetTransaction.user_id == user_id)
             .group_by(func.lower(BudgetTransaction.description))
             .all()
         )
-        date_map = {desc: dt for desc, dt in latest_dates}
+
+        date_map = {row.desc_lower: row.max_date for row in latest_rows}
+        source_map = {row.desc_lower: row.source for row in latest_rows}
         for sub in subs:
-            sub.latest_transaction_date = date_map.get(sub.name.lower())
+            key = sub.name.lower()
+            sub.latest_transaction_date = date_map.get(key)
+            sub.latest_transaction_source = source_map.get(key)
 
     return subs
 

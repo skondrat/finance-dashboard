@@ -115,11 +115,18 @@ export function SubscriptionList({ onEdit }: Props) {
                     {sub.cadence}
                   </p>
                 </div>
-                {sub.latest_transaction_date && (
+                {(sub.latest_transaction_date || sub.latest_transaction_source) && (
                   <div className="text-right mr-4 shrink-0">
-                    <p className="font-mono text-xs text-on-surface-variant">
-                      Last: {sub.latest_transaction_date}
-                    </p>
+                    {sub.latest_transaction_source && (
+                      <p className="font-mono text-[10px] uppercase tracking-[0.05em] text-on-surface-variant">
+                        {sub.latest_transaction_source}
+                      </p>
+                    )}
+                    {sub.latest_transaction_date && (
+                      <p className="font-mono text-xs text-on-surface-variant">
+                        Last: {sub.latest_transaction_date}
+                      </p>
+                    )}
                   </div>
                 )}
                 <div className="text-right mr-4">
