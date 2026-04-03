@@ -91,6 +91,7 @@ def _q(v: Decimal) -> float:
 @router.get("/cashflow/sankey")
 def get_cashflow_sankey(
     currency: Optional[str] = Query("EUR"),
+    period: Optional[str] = Query("monthly"),
     year: Optional[int] = Query(None),
     month: Optional[int] = Query(None),
     db: Session = Depends(get_db),
@@ -106,8 +107,30 @@ def get_cashflow_sankey(
     """
     if year is None or month is None:
         year, month = _last_completed_month()
-    start = date(year, month, 1)
-    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+
+    # ── Resolve date range based on period ─────────────────────────────────
+    if period == "yearly":
+        start = date(year, 1, 1)
+        end = date(year + 1, 1, 1)
+        income_months = list(range(1, 13))
+    elif period == "ytd":
+        today = date.today()
+        if year < today.year:
+            # Past year: full year
+            start = date(year, 1, 1)
+            end = date(year + 1, 1, 1)
+            income_months = list(range(1, 13))
+        else:
+            # Current year: Jan through last completed month
+            lc_year, lc_month = _last_completed_month()
+            start = date(year, 1, 1)
+            end = date(lc_year, lc_month + 1, 1) if lc_month < 12 else date(lc_year + 1, 1, 1)
+            income_months = list(range(1, lc_month + 1))
+    else:
+        # monthly (default)
+        start = date(year, month, 1)
+        end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+        income_months = [month]
 
     # ── Income sources (all currencies, converted) ──────────────────────────
     rate_cache: dict = {}
@@ -116,7 +139,7 @@ def get_cashflow_sankey(
         .filter(
             IncomeSource.user_id == user_id,
             IncomeSource.year == year,
-            IncomeSource.month == month,
+            IncomeSource.month.in_(income_months),
         )
         .all()
     )
@@ -293,10 +316,15 @@ def get_cashflow_sankey(
                 "value": _q(amount),
             })
 
-    month_label = f"{year}-{month:02d}"
+    if period == "yearly":
+        period_label = str(year)
+    elif period == "ytd":
+        period_label = f"{year} YTD"
+    else:
+        period_label = f"{year}-{month:02d}"
 
     return {
-        "month": month_label,
+        "month": period_label,
         "total_income": _q(total_income),
         "total_spend": _q(total_spend),
         "total_savings": _q(savings),
