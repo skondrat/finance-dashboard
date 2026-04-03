@@ -115,6 +115,13 @@ export function SubscriptionList({ onEdit }: Props) {
                     {sub.cadence}
                   </p>
                 </div>
+                {sub.latest_transaction_date && (
+                  <div className="text-right mr-4 shrink-0">
+                    <p className="font-mono text-xs text-on-surface-variant">
+                      Last: {sub.latest_transaction_date}
+                    </p>
+                  </div>
+                )}
                 <div className="text-right mr-4">
                   <p className="font-mono text-sm text-on-surface">
                     {formatCurrency(sub.amount, sub.currency)}

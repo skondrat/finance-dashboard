@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id
 from app.database import get_db
+from app.models.budget_transaction import BudgetTransaction
 from app.models.subscription import DismissedSuggestion, Subscription
 from app.models.statement_import import StatementImport
 from app.schemas.subscription import (
@@ -35,12 +36,33 @@ def list_subscriptions(
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
-    return (
+    subs = (
         db.query(Subscription)
         .filter(Subscription.user_id == user_id)
         .order_by(Subscription.status, Subscription.name)
         .all()
     )
+
+    # Find latest transaction date per subscription name
+    if subs:
+        sub_names = [s.name for s in subs]
+        latest_dates = (
+            db.query(
+                func.lower(BudgetTransaction.description),
+                func.max(BudgetTransaction.date),
+            )
+            .filter(
+                BudgetTransaction.user_id == user_id,
+                func.lower(BudgetTransaction.description).in_([n.lower() for n in sub_names]),
+            )
+            .group_by(func.lower(BudgetTransaction.description))
+            .all()
+        )
+        date_map = {desc: dt for desc, dt in latest_dates}
+        for sub in subs:
+            sub.latest_transaction_date = date_map.get(sub.name.lower())
+
+    return subs
 
 
 # ---------------------------------------------------------------------------
