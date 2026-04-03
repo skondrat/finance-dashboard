@@ -13,21 +13,12 @@ import { useCurrencyStore } from "@/stores/currency-store";
 import { formatCurrency } from "@/lib/utils";
 
 const VIBRANT_PALETTE = [
-  "#3B82F6", // blue
-  "#22C55E", // green
-  "#EAB308", // yellow
-  "#A855F7", // purple
-  "#EF4444", // red
-  "#F97316", // orange
-  "#06B6D4", // cyan
-  "#EC4899", // pink
-  "#10B981", // emerald
-  "#8B5CF6", // violet
-  "#14B8A6", // teal
-  "#F59E0B", // amber
-  "#64748B", // slate
-  "#6366F1", // indigo
-  "#84CC16", // lime
+  "#3B82F6", "#22C55E", "#EAB308", "#A855F7", "#EF4444",
+  "#F97316", "#06B6D4", "#EC4899", "#10B981", "#8B5CF6",
+  "#14B8A6", "#F59E0B", "#6366F1", "#84CC16", "#D946EF",
+  "#0EA5E9", "#E11D48", "#059669", "#7C3AED", "#DC2626",
+  "#EA580C", "#0891B2", "#DB2777", "#2563EB", "#65A30D",
+  "#CA8A04", "#9333EA", "#0D9488", "#C026D3", "#4F46E5",
 ];
 
 interface CustomTooltipProps {

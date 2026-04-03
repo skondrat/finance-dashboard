@@ -9,9 +9,36 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 _VIBRANT_COLORS = [
-    "#3B82F6", "#22C55E", "#EAB308", "#A855F7", "#EF4444",
-    "#F97316", "#06B6D4", "#EC4899", "#10B981", "#8B5CF6",
-    "#14B8A6", "#F59E0B", "#6366F1", "#84CC16", "#D946EF",
+    "#3B82F6",  # blue
+    "#22C55E",  # green
+    "#EAB308",  # yellow
+    "#A855F7",  # purple
+    "#EF4444",  # red
+    "#F97316",  # orange
+    "#06B6D4",  # cyan
+    "#EC4899",  # pink
+    "#10B981",  # emerald
+    "#8B5CF6",  # violet
+    "#14B8A6",  # teal
+    "#F59E0B",  # amber
+    "#6366F1",  # indigo
+    "#84CC16",  # lime
+    "#D946EF",  # fuchsia
+    "#0EA5E9",  # sky
+    "#E11D48",  # rose
+    "#059669",  # green-700
+    "#7C3AED",  # violet-600
+    "#DC2626",  # red-600
+    "#EA580C",  # orange-600
+    "#0891B2",  # cyan-600
+    "#DB2777",  # pink-600
+    "#2563EB",  # blue-600
+    "#65A30D",  # lime-600
+    "#CA8A04",  # yellow-600
+    "#9333EA",  # purple-600
+    "#0D9488",  # teal-600
+    "#C026D3",  # fuchsia-600
+    "#4F46E5",  # indigo-600
 ]
 
 
