@@ -38,6 +38,7 @@ class SubscriptionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     latest_transaction_date: Optional[date] = None
+    latest_transaction_source: Optional[str] = None
 
 
 class SuggestionResponse(BaseModel):
