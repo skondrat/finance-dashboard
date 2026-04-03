@@ -7,10 +7,11 @@ import { formatCurrency } from "@/lib/utils";
 interface BreakdownRowProps {
   year: number;
   month: number;
+  period?: "monthly" | "yearly" | "ytd";
 }
 
-export function BreakdownRow({ year, month }: BreakdownRowProps) {
-  const { data, isLoading } = useCashflowSankey(year, month);
+export function BreakdownRow({ year, month, period = "monthly" }: BreakdownRowProps) {
+  const { data, isLoading } = useCashflowSankey(year, month, period);
   const currency = useCurrencyStore((s) => s.currency);
 
   if (isLoading || !data) {

@@ -80,10 +80,11 @@ interface TooltipData {
 interface SankeyDiagramProps {
   year: number;
   month: number;
+  period?: "monthly" | "yearly" | "ytd";
 }
 
-export function SankeyDiagram({ year, month }: SankeyDiagramProps) {
-  const { data, isLoading } = useCashflowSankey(year, month);
+export function SankeyDiagram({ year, month, period = "monthly" }: SankeyDiagramProps) {
+  const { data, isLoading } = useCashflowSankey(year, month, period);
   const currency = useCurrencyStore((s) => s.currency);
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);

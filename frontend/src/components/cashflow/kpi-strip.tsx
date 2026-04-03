@@ -42,10 +42,11 @@ function KpiCard({ label, value, large, colorClass }: KpiCardProps) {
 interface CashflowKpiStripProps {
   year: number;
   month: number;
+  period?: "monthly" | "yearly" | "ytd";
 }
 
-export function CashflowKpiStrip({ year, month }: CashflowKpiStripProps) {
-  const { data, isLoading } = useCashflowSankey(year, month);
+export function CashflowKpiStrip({ year, month, period = "monthly" }: CashflowKpiStripProps) {
+  const { data, isLoading } = useCashflowSankey(year, month, period);
   const currency = useCurrencyStore((s) => s.currency);
 
   if (isLoading || !data) {
