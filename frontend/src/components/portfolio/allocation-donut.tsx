@@ -67,6 +67,7 @@ function DonutTooltip({ active, payload, currency }: DonutTooltipProps) {
 
 export function AllocationDonut() {
   const [activeTab, setActiveTab] = useState<TabKey>("type");
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const { data, isLoading } = useAllocation(activeTab);
   const currency = useCurrencyStore((s) => s.currency);
 
@@ -123,10 +124,23 @@ export function AllocationDonut() {
                   innerRadius="60%"
                   outerRadius="80%"
                   paddingAngle={2}
-                  stroke="none"
+                  strokeWidth={0}
+                  onMouseEnter={(_, idx) => setActiveIndex(idx)}
+                  onMouseLeave={() => setActiveIndex(null)}
                 >
                   {segments.map((_, idx) => (
-                    <Cell key={idx} fill={colors[idx]} />
+                    <Cell
+                      key={idx}
+                      fill={colors[idx]}
+                      opacity={activeIndex === null || activeIndex === idx ? 1 : 0.4}
+                      stroke={activeIndex === idx ? colors[idx] : "none"}
+                      strokeWidth={activeIndex === idx ? 3 : 0}
+                      style={{
+                        transition: "opacity 150ms, transform 150ms",
+                        filter: activeIndex === idx ? "brightness(1.15)" : "none",
+                        cursor: "pointer",
+                      }}
+                    />
                   ))}
                 </Pie>
                 <Tooltip
@@ -148,7 +162,16 @@ export function AllocationDonut() {
       {segments.length > 0 && (
         <div className="mt-4 space-y-2">
           {segments.map((seg, idx) => (
-            <div key={seg.label} className="flex items-center justify-between">
+            <div
+              key={seg.label}
+              className="flex items-center justify-between cursor-pointer rounded px-1 py-0.5 transition-all duration-150"
+              style={{
+                opacity: activeIndex === null || activeIndex === idx ? 1 : 0.4,
+                backgroundColor: activeIndex === idx ? `${colors[idx]}15` : "transparent",
+              }}
+              onMouseEnter={() => setActiveIndex(idx)}
+              onMouseLeave={() => setActiveIndex(null)}
+            >
               <div className="flex items-center gap-2">
                 <span
                   className="inline-block h-3 w-3 rounded-full"
