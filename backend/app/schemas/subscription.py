@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -37,6 +37,7 @@ class SubscriptionResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    latest_transaction_date: Optional[date] = None
 
 
 class SuggestionResponse(BaseModel):

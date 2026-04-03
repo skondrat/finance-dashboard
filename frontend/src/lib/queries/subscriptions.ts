@@ -12,6 +12,7 @@ export interface Subscription {
   status: string;
   created_at: string;
   updated_at: string;
+  latest_transaction_date: string | null;
 }
 
 export interface SubscriptionSuggestion {
