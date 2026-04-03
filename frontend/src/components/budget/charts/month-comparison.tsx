@@ -1,9 +1,33 @@
 "use client";
 
+import { useState } from "react";
 import { useSpendByCategory, type SpendByCategoryItem } from "@/lib/queries/budget";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+
+const MONTHS = [
+  { value: 1, label: "Jan" },
+  { value: 2, label: "Feb" },
+  { value: 3, label: "Mar" },
+  { value: 4, label: "Apr" },
+  { value: 5, label: "May" },
+  { value: 6, label: "Jun" },
+  { value: 7, label: "Jul" },
+  { value: 8, label: "Aug" },
+  { value: 9, label: "Sep" },
+  { value: 10, label: "Oct" },
+  { value: 11, label: "Nov" },
+  { value: 12, label: "Dec" },
+];
+
+const YEARS = [2025, 2026];
+
+const selectClass =
+  "rounded-lg border border-on-surface-variant/20 bg-surface-container-lowest px-1.5 py-0.5 font-mono text-[10px] text-on-surface focus:outline-none appearance-none cursor-pointer";
+
+type SortKey = "pctChange" | "previous" | "current";
+type SortDir = "asc" | "desc";
 
 interface MonthComparisonProps {
   month: number;
@@ -13,23 +37,31 @@ interface MonthComparisonProps {
 export function MonthComparison({ month, year }: MonthComparisonProps) {
   const currency = useCurrencyStore((s) => s.currency);
 
-  // Current month
-  const { data: currentData, isLoading: loadingCurrent } = useSpendByCategory(
-    "monthly",
-    month,
-    year
-  );
+  // Selectable months
+  const defaultPrevMonth = month === 1 ? 12 : month - 1;
+  const defaultPrevYear = month === 1 ? year - 1 : year;
+  const [month1, setMonth1] = useState(defaultPrevMonth);
+  const [year1, setYear1] = useState(defaultPrevYear);
+  const [month2, setMonth2] = useState(month);
+  const [year2, setYear2] = useState(year);
 
-  // Previous month
-  const prevMonth = month === 1 ? 12 : month - 1;
-  const prevYear = month === 1 ? year - 1 : year;
-  const { data: prevData, isLoading: loadingPrev } = useSpendByCategory(
-    "monthly",
-    prevMonth,
-    prevYear
-  );
+  // Sorting
+  const [sortKey, setSortKey] = useState<SortKey>("pctChange");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  const isLoading = loadingCurrent || loadingPrev;
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  };
+
+  const { data: data1, isLoading: loading1 } = useSpendByCategory("monthly", month1, year1);
+  const { data: data2, isLoading: loading2 } = useSpendByCategory("monthly", month2, year2);
+
+  const isLoading = loading1 || loading2;
 
   if (isLoading) {
     return (
@@ -42,15 +74,15 @@ export function MonthComparison({ month, year }: MonthComparisonProps) {
     );
   }
 
-  if (!currentData || !prevData) return null;
+  if (!data1 || !data2) return null;
 
   // Build comparison data
   const prevMap = new Map<string, SpendByCategoryItem>();
-  for (const item of prevData) {
+  for (const item of data1) {
     prevMap.set(item.category.name, item);
   }
 
-  const comparisons = currentData
+  const comparisons = data2
     .map((curr) => {
       const prev = prevMap.get(curr.category.name);
       const currSpent = curr.spent;
@@ -68,18 +100,69 @@ export function MonthComparison({ month, year }: MonthComparisonProps) {
       };
     })
     .filter((c) => c.current > 0 || c.previous > 0)
-    .sort((a, b) => Math.abs(b.pctChange) - Math.abs(a.pctChange));
+    .sort((a, b) => {
+      const mult = sortDir === "desc" ? 1 : -1;
+      if (sortKey === "pctChange") return mult * (Math.abs(b.pctChange) - Math.abs(a.pctChange));
+      if (sortKey === "previous") return mult * (b.previous - a.previous);
+      return mult * (b.current - a.current);
+    });
 
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const sortArrow = (key: SortKey) =>
+    sortKey === key ? (sortDir === "desc" ? " ↓" : " ↑") : "";
 
   return (
     <div className="rounded-2xl bg-surface-container-low p-6">
-      <h2 className="font-display text-xl font-medium text-on-surface mb-1">
+      <h2 className="font-display text-xl font-medium text-on-surface mb-2">
         Month-over-Month
       </h2>
-      <p className="font-mono text-xs text-on-surface-variant mb-4">
-        {monthNames[prevMonth - 1]} vs {monthNames[month - 1]} {year}
-      </p>
+
+      {/* Month selectors */}
+      <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+        <select value={month1} onChange={(e) => setMonth1(Number(e.target.value))} className={selectClass}>
+          {MONTHS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+        <select value={year1} onChange={(e) => setYear1(Number(e.target.value))} className={selectClass}>
+          {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <span className="font-mono text-xs text-on-surface-variant">vs</span>
+        <select value={month2} onChange={(e) => setMonth2(Number(e.target.value))} className={selectClass}>
+          {MONTHS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+        <select value={year2} onChange={(e) => setYear2(Number(e.target.value))} className={selectClass}>
+          {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+
+      {/* Sort buttons */}
+      <div className="flex gap-2 mb-3">
+        <button
+          onClick={() => toggleSort("previous")}
+          className={cn(
+            "font-mono text-[10px] uppercase tracking-[0.1em] px-2 py-1 rounded-lg transition-colors",
+            sortKey === "previous" ? "bg-on-surface text-surface" : "text-on-surface-variant hover:text-on-surface"
+          )}
+        >
+          {MONTHS.find((m) => m.value === month1)?.label}{sortArrow("previous")}
+        </button>
+        <button
+          onClick={() => toggleSort("current")}
+          className={cn(
+            "font-mono text-[10px] uppercase tracking-[0.1em] px-2 py-1 rounded-lg transition-colors",
+            sortKey === "current" ? "bg-on-surface text-surface" : "text-on-surface-variant hover:text-on-surface"
+          )}
+        >
+          {MONTHS.find((m) => m.value === month2)?.label}{sortArrow("current")}
+        </button>
+        <button
+          onClick={() => toggleSort("pctChange")}
+          className={cn(
+            "font-mono text-[10px] uppercase tracking-[0.1em] px-2 py-1 rounded-lg transition-colors",
+            sortKey === "pctChange" ? "bg-on-surface text-surface" : "text-on-surface-variant hover:text-on-surface"
+          )}
+        >
+          Diff %{sortArrow("pctChange")}
+        </button>
+      </div>
 
       {comparisons.length === 0 ? (
         <p className="font-mono text-sm text-on-surface-variant text-center py-4">
