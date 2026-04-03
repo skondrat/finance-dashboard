@@ -24,15 +24,7 @@ export function SuggestionCards({ enabled }: Props) {
 
   const suggestions = data?.suggestions ?? [];
 
-  if (suggestions.length === 0) {
-    return (
-      <div className="rounded-2xl bg-surface-container-lowest p-6">
-        <p className="font-mono text-xs text-on-surface-variant text-center">
-          No recurring expenses detected in your imported statements.
-        </p>
-      </div>
-    );
-  }
+  if (suggestions.length === 0) return null;
 
   function handleConfirm(description: string, amount: number, currency: string) {
     confirmMutation.mutate({
