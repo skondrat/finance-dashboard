@@ -3,6 +3,7 @@
 import { CategoryDistributionChart } from "@/components/budget/charts/category-distribution";
 import { IncomeVsSpendChart } from "@/components/budget/charts/income-vs-spend";
 import { MonthComparison } from "@/components/budget/charts/month-comparison";
+import { SpendTreemap } from "@/components/budget/charts/spend-treemap";
 import { SpendingTrendsChart } from "@/components/budget/charts/spending-trends";
 
 interface SpendingChartsProps {
@@ -21,6 +22,9 @@ export function SpendingCharts({ period, month, year, onCategoryClick }: Spendin
       )}
       <SpendingTrendsChart />
       <IncomeVsSpendChart />
+      {period === "monthly" && month && year && (
+        <SpendTreemap period={period} month={month} year={year} onCategoryClick={onCategoryClick} />
+      )}
     </div>
   );
 }
