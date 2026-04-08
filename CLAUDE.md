@@ -1,6 +1,6 @@
 # finance-dashboard Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-02
+Auto-generated from all feature plans. Last updated: 2026-04-08
 
 ## Active Technologies
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, pdfplumber (PDF table extraction), anthropic (Anthropic Python SDK), Next.js 16, TanStack Query, Zustand, react-dropzone (002-pdf-statement-import)
@@ -51,6 +51,11 @@ Auto-generated from all feature plans. Last updated: 2026-04-02
 - N/A (reads from existing endpoints) (039-budget-spending-charts)
 - SQLite via SQLAlchemy (existing `networth_snapshots` table) (040-edit-networth-snapshot)
 - SQLite via SQLAlchemy (existing `budget_transactions` table) (042-edit-delete-transactions)
+- Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI (backend); Next.js 16, TanStack Query v5, d3-sankey (frontend) (044-cashflow-month-selector)
+- Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query v5, Zustand (frontend) (067-cashflow-period-selector)
+- SQLite via SQLAlchemy (existing `income_sources`, `budget_transactions`, `categories` tables — no schema changes) (067-cashflow-period-selector)
+- TypeScript 5 (frontend only) + Next.js 16, Recharts 3.8.1 (Treemap component), TanStack Query v5, Zustand, Tailwind CSS v4 (075-budget-spend-treemap)
+- N/A (reads from existing backend API) (075-budget-spend-treemap)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -70,10 +75,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
-- 042-edit-delete-transactions: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query, Zustand (frontend)
-- 041-import-nw-breakdown: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query (frontend)
-- 040-edit-networth-snapshot: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query, Zustand (frontend)
-- 039-budget-spending-charts: Added TypeScript 5 (frontend only) + Next.js 16, Recharts 3, TanStack Query
+- 075-budget-spend-treemap: Added TypeScript 5 (frontend only) + Next.js 16, Recharts 3.8.1 (Treemap component), TanStack Query v5, Zustand, Tailwind CSS v4
+- 067-cashflow-period-selector: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query v5, Zustand (frontend)
+- 044-cashflow-month-selector: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI (backend); Next.js 16, TanStack Query v5, d3-sankey (frontend)
 
 
 <!-- MANUAL ADDITIONS START -->
