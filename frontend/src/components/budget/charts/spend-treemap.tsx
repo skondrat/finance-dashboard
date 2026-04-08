@@ -102,13 +102,20 @@ function mergeData(
         baselineValue = item.category.monthly_budget;
         if (baselineValue !== null && baselineValue > 0) {
           pctChange = ((item.spent - baselineValue) / baselineValue) * 100;
+        } else if (baselineValue !== null && baselineValue === 0 && item.spent > 0) {
+          // Budget is 0 but spending exists → treat as 100% over
+          pctChange = 100;
         }
       } else {
         const comp = compMap.get(item.category.name);
-        baselineValue = comp?.spent ?? null;
+        baselineValue = comp ? comp.spent : null;
         if (baselineValue !== null && baselineValue > 0) {
           pctChange = ((item.spent - baselineValue) / baselineValue) * 100;
+        } else if (baselineValue !== null && baselineValue === 0 && item.spent > 0) {
+          // No spending in comparison month but spending now → treat as 100% increase
+          pctChange = 100;
         }
+        // baselineValue === null means category didn't exist in comparison → stays gray
       }
 
       return {
