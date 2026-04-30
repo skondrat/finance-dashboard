@@ -37,6 +37,45 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["import"])
 
 
+def _store_exchange_rate(db: Session, currency: str, rate_str: str) -> None:
+    """Store a user-provided exchange rate as a universal fallback (currency→EUR).
+
+    Uses a baseline date (2000-01-01) so the rate serves as a "nearest earlier"
+    fallback for any transaction date via fx_service.get_rate().
+    """
+    from datetime import date as date_type, datetime
+    from decimal import Decimal
+    from app.models.exchange_rate import ExchangeRate
+    from sqlalchemy import and_
+
+    rate_value = Decimal(rate_str)
+    baseline = date_type(2000, 1, 1)
+
+    existing = (
+        db.query(ExchangeRate)
+        .filter(
+            and_(
+                ExchangeRate.base_currency == currency,
+                ExchangeRate.target_currency == "EUR",
+                ExchangeRate.date == baseline,
+            )
+        )
+        .first()
+    )
+    if existing:
+        existing.rate = rate_value
+        existing.fetched_at = datetime.utcnow()
+    else:
+        db.add(ExchangeRate(
+            base_currency=currency,
+            target_currency="EUR",
+            rate=rate_value,
+            date=baseline,
+            fetched_at=datetime.utcnow(),
+        ))
+    db.commit()
+
+
 def _sse_event(data: dict) -> str:
     """Format a dict as an SSE data line."""
     return f"data: {json_mod.dumps(data)}\n\n"
@@ -65,6 +104,7 @@ async def upload_import(
     source: Optional[str] = Form(default=None),
     bank_profile_id: Optional[str] = Form(default=None),
     currency: Optional[str] = Form(default="EUR"),
+    exchange_rate: Optional[str] = Form(default=None),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
@@ -111,6 +151,10 @@ async def upload_import(
             status_code=400,
             detail={"error_type": "file_too_large", "message": "PDF file exceeds 10 MB size limit.", "action": "Upload a smaller PDF file."},
         )
+
+    # Store user-provided exchange rate if given
+    if exchange_rate and currency and currency != "EUR":
+        _store_exchange_rate(db, currency, exchange_rate)
 
     # For PDF imports, stream progress via SSE
     if fmt == "pdf":

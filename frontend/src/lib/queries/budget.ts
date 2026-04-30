@@ -123,6 +123,7 @@ export interface UploadParams {
   file: File;
   source?: string;
   currency?: string;
+  exchange_rate?: string;
 }
 
 export function useBudgetSummary(
@@ -280,7 +281,7 @@ export function useImportUpload() {
   const queryClient = useQueryClient();
 
   return useMutation<ImportResponse, Error, UploadParams>({
-    mutationFn: ({ file, source, currency }) => {
+    mutationFn: ({ file, source, currency, exchange_rate }) => {
       const formData = new FormData();
       formData.append("file", file);
       if (source) {
@@ -288,6 +289,9 @@ export function useImportUpload() {
       }
       if (currency) {
         formData.append("currency", currency);
+      }
+      if (exchange_rate) {
+        formData.append("exchange_rate", exchange_rate);
       }
 
       return apiFetch<ImportResponse>("/budget/import/upload", {
@@ -325,7 +329,7 @@ export function useImportWithProgress() {
   });
 
   const upload = useCallback(
-    async (file: File, source?: string, currency?: string) => {
+    async (file: File, source?: string, currency?: string, exchange_rate?: string) => {
       setProgress({
         stage: "extracting",
         total: 0,
@@ -346,6 +350,9 @@ export function useImportWithProgress() {
       }
       if (currency) {
         formData.append("currency", currency);
+      }
+      if (exchange_rate) {
+        formData.append("exchange_rate", exchange_rate);
       }
 
       try {

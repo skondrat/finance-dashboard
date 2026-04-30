@@ -426,6 +426,7 @@ export function ImportModal() {
   const [preview, setPreview] = useState<ImportResponse | null>(null);
   const [selectedSource, setSelectedSource] = useState<string>("");
   const [selectedCurrency, setSelectedCurrency] = useState<string>("EUR");
+  const [exchangeRate, setExchangeRate] = useState<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [overrides, setOverrides] = useState<Map<number, string | null>>(
     new Map()
@@ -466,7 +467,12 @@ export function ImportModal() {
         return;
       }
 
-      // Non-PDF: upload immediately with selected currency
+      // If non-EUR currency, wait for exchange rate before uploading
+      if (selectedCurrency !== "EUR") {
+        return;
+      }
+
+      // Non-PDF + EUR: upload immediately
       uploadMutation.mutate(
         { file, currency: selectedCurrency },
         {
@@ -481,7 +487,21 @@ export function ImportModal() {
 
   function handleUploadPdf() {
     if (!selectedFile || !selectedSource) return;
-    sseUpload(selectedFile, selectedSource, selectedCurrency);
+    const rate = selectedCurrency !== "EUR" ? exchangeRate : undefined;
+    sseUpload(selectedFile, selectedSource, selectedCurrency, rate);
+  }
+
+  function handleUploadNonPdf() {
+    if (!selectedFile) return;
+    const rate = selectedCurrency !== "EUR" ? exchangeRate : undefined;
+    uploadMutation.mutate(
+      { file: selectedFile, currency: selectedCurrency, exchange_rate: rate },
+      {
+        onSuccess: (data) => {
+          setPreview(data);
+        },
+      }
+    );
   }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -658,6 +678,7 @@ export function ImportModal() {
           setSelectedFile(null);
           setSelectedSource("");
           setSelectedCurrency("EUR");
+          setExchangeRate("");
           uploadMutation.reset();
           sseReset();
           setIsOpen(false);
@@ -780,7 +801,7 @@ export function ImportModal() {
                     {["EUR", "USD", "UAH"].map((cur) => (
                       <button
                         key={cur}
-                        onClick={() => setSelectedCurrency(cur)}
+                        onClick={() => { setSelectedCurrency(cur); if (cur === "EUR") setExchangeRate(""); }}
                         className={cn(
                           "rounded-lg px-3 py-1.5 font-mono text-xs transition-colors",
                           selectedCurrency === cur
@@ -792,7 +813,42 @@ export function ImportModal() {
                       </button>
                     ))}
                   </div>
+                  {selectedCurrency !== "EUR" && (
+                    <div className="flex items-center gap-2">
+                      <label className="font-mono text-xs text-on-surface-variant">
+                        1 {selectedCurrency} =
+                      </label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        min="0"
+                        placeholder="0.0000"
+                        value={exchangeRate}
+                        onChange={(e) => setExchangeRate(e.target.value)}
+                        className="w-24 rounded-lg border border-on-surface-variant/20 bg-surface-container-lowest px-2 py-1.5 font-mono text-xs text-on-surface"
+                      />
+                      <span className="font-mono text-xs text-on-surface-variant">EUR</span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Upload button for non-PDF when currency needs rate */}
+                {selectedCurrency !== "EUR" && selectedFile && !isPdf && (
+                  <div className="mt-3">
+                    <button
+                      onClick={handleUploadNonPdf}
+                      disabled={!exchangeRate || parseFloat(exchangeRate) <= 0 || uploadMutation.isPending}
+                      className="rounded-xl bg-on-surface px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-surface transition-colors hover:bg-on-surface/90 disabled:opacity-50"
+                    >
+                      {uploadMutation.isPending ? "Uploading..." : "Upload"}
+                    </button>
+                    {(!exchangeRate || parseFloat(exchangeRate) <= 0) && (
+                      <p className="mt-1 font-mono text-[10px] text-on-error-container">
+                        Exchange rate is required for {selectedCurrency} imports
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Source selector for PDF */}
                 {isPdf && selectedFile && !preview && (
@@ -818,7 +874,7 @@ export function ImportModal() {
                       </select>
                       <button
                         onClick={handleUploadPdf}
-                        disabled={!selectedSource || sseProgress.isProcessing}
+                        disabled={!selectedSource || sseProgress.isProcessing || (selectedCurrency !== "EUR" && (!exchangeRate || parseFloat(exchangeRate) <= 0))}
                         className="rounded-xl bg-on-surface px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-surface transition-colors hover:bg-on-surface/90 disabled:opacity-50"
                       >
                         {sseProgress.isProcessing
