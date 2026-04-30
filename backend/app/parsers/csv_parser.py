@@ -15,7 +15,7 @@ from app.parsers.registry import StatementParser
 
 # Common column name mappings used during auto-detection
 _DATE_NAMES = {"date", "transaction date", "trans date", "booking date", "value date", "datum"}
-_AMOUNT_NAMES = {"amount", "sum", "value", "betrag", "debit/credit"}
+_AMOUNT_NAMES = {"amount", "sum", "value", "betrag", "debit/credit", "card currency amount"}
 _DESC_NAMES = {"description", "memo", "details", "narrative", "payee", "beschreibung", "text"}
 _REF_NAMES = {"reference", "ref", "transaction id", "id", "referenz"}
 
@@ -25,10 +25,21 @@ def _normalize_header(name: str) -> str:
 
 
 def _detect_column(headers: list[str], candidates: set[str]) -> str | None:
-    """Return the first header that matches one of the candidate names."""
+    """Return the first header that matches one of the candidate names.
+
+    First tries exact match, then falls back to prefix matching
+    (e.g. 'date and time' matches candidate 'date').
+    """
+    # Exact match first
     for h in headers:
         if _normalize_header(h) in candidates:
             return h
+    # Prefix match: header starts with a candidate word
+    for h in headers:
+        normalized = _normalize_header(h)
+        for c in candidates:
+            if normalized.startswith(c):
+                return h
     return None
 
 
@@ -95,11 +106,15 @@ class CsvParser(StatementParser):
                 continue
 
             # Normalize the date to ISO format
-            try:
-                parsed_date = datetime.strptime(raw_date, date_format)
-                iso_date = parsed_date.strftime("%Y-%m-%d")
-            except ValueError:
-                iso_date = raw_date
+            iso_date = raw_date
+            # Try configured format first, then common fallbacks
+            for fmt in [date_format, "%d.%m.%Y %H:%M:%S", "%d.%m.%Y", "%m/%d/%Y", "%d/%m/%Y"]:
+                try:
+                    parsed_date = datetime.strptime(raw_date, fmt)
+                    iso_date = parsed_date.strftime("%Y-%m-%d")
+                    break
+                except ValueError:
+                    continue
 
             # Normalize the amount: remove thousands separators, handle comma decimals
             cleaned_amount = raw_amount.replace(" ", "")
