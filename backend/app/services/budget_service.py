@@ -401,20 +401,20 @@ def get_spend_by_category(
     """
     start, end = _resolve_date_range(period, month, year, from_date, to_date)
 
-    # Get all active categories for the user, excluding Investments
-    # (investments are tracked separately via investment_rate)
+    # Get all active categories for the user (Investments included so it
+    # shows in the table; it's still excluded from the Monthly Spend KPI)
     categories = (
         db.query(Category)
         .filter(
             Category.user_id == user_id,
             Category.is_archived == False,  # noqa: E712
-            Category.name != "Investments",
         )
         .all()
     )
 
-    # Aggregate spend per category, converting all currencies
-    investments_cat_id = _investments_category_id(db, user_id)
+    # Aggregate spend per category, converting all currencies.
+    # Include investment transactions here so the Investments row shows
+    # its actual amount in the table.
     spend_txns = (
         db.query(BudgetTransaction)
         .filter(
@@ -422,7 +422,6 @@ def get_spend_by_category(
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.amount < 0,
-            _is_spend_filter(investments_cat_id),
             _confirmed_tx_filter(),
         )
         .all()
