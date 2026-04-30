@@ -17,7 +17,12 @@ from app.database import get_db
 from app.models.budget_transaction import BudgetTransaction
 from app.models.category import Category
 from app.models.income_source import IncomeSource
-from app.services.budget_service import _convert_amount
+from app.services.budget_service import (
+    _convert_amount,
+    _investments_category_id,
+    _is_investment_filter,
+    _is_spend_filter,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["budget-charts"])
 
@@ -76,12 +81,13 @@ def income_vs_spend(
         income_map[key] = income_map.get(key, _ZERO) + converted
 
     # Aggregate spend (negative non-investment transactions) by year/month with currency conversion
+    investments_cat_id = _investments_category_id(db, user_id)
     spend_txns = (
         db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
             BudgetTransaction.amount < 0,
-            BudgetTransaction.is_investment == False,  # noqa: E712
+            _is_spend_filter(investments_cat_id),
         )
         .all()
     )
@@ -137,12 +143,13 @@ def savings_over_time(
         income_map[key] = income_map.get(key, _ZERO) + converted
 
     # Spend by month (excluding investments) with currency conversion
+    investments_cat_id = _investments_category_id(db, user_id)
     spend_txns = (
         db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
             BudgetTransaction.amount < 0,
-            BudgetTransaction.is_investment == False,  # noqa: E712
+            _is_spend_filter(investments_cat_id),
         )
         .all()
     )
@@ -201,12 +208,13 @@ def investment_rate_trend(
         income_map[key] = income_map.get(key, _ZERO) + converted
 
     # Investment spend by month with currency conversion
+    investments_cat_id = _investments_category_id(db, user_id)
     inv_txns = (
         db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
             BudgetTransaction.amount < 0,
-            BudgetTransaction.is_investment == True,  # noqa: E712
+            _is_investment_filter(investments_cat_id),
         )
         .all()
     )
@@ -277,6 +285,7 @@ def category_distribution(
         )
 
     # Fetch non-investment spend transactions and convert to target currency
+    investments_cat_id = _investments_category_id(db, user_id)
     spend_txns = (
         db.query(BudgetTransaction)
         .filter(
@@ -284,7 +293,7 @@ def category_distribution(
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.amount < 0,
-            BudgetTransaction.is_investment == False,  # noqa: E712
+            _is_spend_filter(investments_cat_id),
         )
         .all()
     )
@@ -370,12 +379,13 @@ def spending_trends(
     last_y, last_m = month_range[-1]
     end = date(last_y + (1 if last_m == 12 else 0), 1 if last_m == 12 else last_m + 1, 1)
 
+    investments_cat_id = _investments_category_id(db, user_id)
     txns = (
         db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
             BudgetTransaction.amount < 0,
-            BudgetTransaction.is_investment == False,  # noqa: E712
+            _is_spend_filter(investments_cat_id),
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
         )

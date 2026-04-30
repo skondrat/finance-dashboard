@@ -16,7 +16,12 @@ from app.database import get_db
 from app.models.budget_transaction import BudgetTransaction
 from app.models.category import Category
 from app.models.income_source import IncomeSource
-from app.services.budget_service import _convert_amount
+from app.services.budget_service import (
+    _convert_amount,
+    _investments_category_id,
+    _is_investment_filter,
+    _is_spend_filter,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["cashflow"])
 
@@ -151,6 +156,7 @@ def get_cashflow_sankey(
         total_income += amt
 
     # ── Expenses (all currencies, converted, grouped by category) ──────────
+    investments_cat_id = _investments_category_id(db, user_id)
     raw_expenses = (
         db.query(BudgetTransaction)
         .filter(
@@ -158,7 +164,7 @@ def get_cashflow_sankey(
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.amount < 0,
-            BudgetTransaction.is_investment == False,  # noqa: E712
+            _is_spend_filter(investments_cat_id),
         )
         .all()
     )
@@ -174,7 +180,7 @@ def get_cashflow_sankey(
             BudgetTransaction.user_id == user_id,
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
-            BudgetTransaction.is_investment == True,  # noqa: E712
+            _is_investment_filter(investments_cat_id),
             BudgetTransaction.amount < 0,
         )
         .all()

@@ -32,6 +32,47 @@ def _confirmed_tx_filter():
         ),
     )
 
+
+def _investments_category_id(db: Session, user_id: str) -> str | None:
+    """Return the user's Investments category id, or None if it doesn't exist."""
+    return (
+        db.query(Category.id)
+        .filter(Category.user_id == user_id, Category.name == "Investments")
+        .scalar()
+    )
+
+
+def _is_investment_filter(investments_cat_id: str | None):
+    """Return SQL filter for transactions that count as investments.
+
+    A transaction is an investment if it has the is_investment flag set,
+    OR its category is the Investments category.
+    """
+    if investments_cat_id is None:
+        return BudgetTransaction.is_investment == True  # noqa: E712
+    return or_(
+        BudgetTransaction.is_investment == True,  # noqa: E712
+        BudgetTransaction.category_id == investments_cat_id,
+    )
+
+
+def _is_spend_filter(investments_cat_id: str | None):
+    """Return SQL filter for transactions that count as regular spend.
+
+    A transaction counts as spend if is_investment is False AND its
+    category is not the Investments category (uncategorized still counts).
+    """
+    base = BudgetTransaction.is_investment == False  # noqa: E712
+    if investments_cat_id is None:
+        return base
+    return and_(
+        base,
+        or_(
+            BudgetTransaction.category_id.is_(None),
+            BudgetTransaction.category_id != investments_cat_id,
+        ),
+    )
+
 _ZERO = Decimal("0")
 _HUNDRED = Decimal("100")
 _QUANT_2 = Decimal("0.01")
@@ -171,12 +212,13 @@ def _spend_for_period(
 ) -> Decimal:
     """Sum of negative BudgetTransaction amounts (abs value) in the period,
     converting all currencies to *currency*."""
+    investments_cat_id = _investments_category_id(db, user_id)
     q = db.query(BudgetTransaction).filter(
         BudgetTransaction.user_id == user_id,
         BudgetTransaction.date >= start,
         BudgetTransaction.date < end,
         BudgetTransaction.amount < 0,
-        BudgetTransaction.is_investment == False,  # noqa: E712
+        _is_spend_filter(investments_cat_id),
         _confirmed_tx_filter(),
     )
     if category_id is not None:
@@ -199,13 +241,14 @@ def _investment_spend_for_period(
 ) -> Decimal:
     """Sum abs value of transactions flagged as investments in the period,
     converting all currencies to *currency*."""
+    investments_cat_id = _investments_category_id(db, user_id)
     rows = (
         db.query(BudgetTransaction)
         .filter(
             BudgetTransaction.user_id == user_id,
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
-            BudgetTransaction.is_investment == True,  # noqa: E712
+            _is_investment_filter(investments_cat_id),
             BudgetTransaction.amount < 0,
             _confirmed_tx_filter(),
         )
@@ -358,17 +401,20 @@ def get_spend_by_category(
     """
     start, end = _resolve_date_range(period, month, year, from_date, to_date)
 
-    # Get all active categories for the user
+    # Get all active categories for the user, excluding Investments
+    # (investments are tracked separately via investment_rate)
     categories = (
         db.query(Category)
         .filter(
             Category.user_id == user_id,
             Category.is_archived == False,  # noqa: E712
+            Category.name != "Investments",
         )
         .all()
     )
 
     # Aggregate spend per category, converting all currencies
+    investments_cat_id = _investments_category_id(db, user_id)
     spend_txns = (
         db.query(BudgetTransaction)
         .filter(
@@ -376,7 +422,7 @@ def get_spend_by_category(
             BudgetTransaction.date >= start,
             BudgetTransaction.date < end,
             BudgetTransaction.amount < 0,
-            BudgetTransaction.is_investment == False,  # noqa: E712
+            _is_spend_filter(investments_cat_id),
             _confirmed_tx_filter(),
         )
         .all()
