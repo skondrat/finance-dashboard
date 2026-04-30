@@ -37,6 +37,45 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["import"])
 
 
+def _store_exchange_rate(db: Session, currency: str, rate_str: str) -> None:
+    """Store a user-provided exchange rate as a universal fallback (currency→EUR).
+
+    Uses a baseline date (2000-01-01) so the rate serves as a "nearest earlier"
+    fallback for any transaction date via fx_service.get_rate().
+    """
+    from datetime import date as date_type, datetime
+    from decimal import Decimal
+    from app.models.exchange_rate import ExchangeRate
+    from sqlalchemy import and_
+
+    rate_value = Decimal(rate_str)
+    baseline = date_type(2000, 1, 1)
+
+    existing = (
+        db.query(ExchangeRate)
+        .filter(
+            and_(
+                ExchangeRate.base_currency == currency,
+                ExchangeRate.target_currency == "EUR",
+                ExchangeRate.date == baseline,
+            )
+        )
+        .first()
+    )
+    if existing:
+        existing.rate = rate_value
+        existing.fetched_at = datetime.utcnow()
+    else:
+        db.add(ExchangeRate(
+            base_currency=currency,
+            target_currency="EUR",
+            rate=rate_value,
+            date=baseline,
+            fetched_at=datetime.utcnow(),
+        ))
+    db.commit()
+
+
 def _sse_event(data: dict) -> str:
     """Format a dict as an SSE data line."""
     return f"data: {json_mod.dumps(data)}\n\n"
@@ -64,6 +103,8 @@ async def upload_import(
     file: UploadFile,
     source: Optional[str] = Form(default=None),
     bank_profile_id: Optional[str] = Form(default=None),
+    currency: Optional[str] = Form(default="EUR"),
+    exchange_rate: Optional[str] = Form(default=None),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
@@ -111,6 +152,10 @@ async def upload_import(
             detail={"error_type": "file_too_large", "message": "PDF file exceeds 10 MB size limit.", "action": "Upload a smaller PDF file."},
         )
 
+    # Store user-provided exchange rate if given
+    if exchange_rate and currency and currency != "EUR":
+        _store_exchange_rate(db, currency, exchange_rate)
+
     # For PDF imports, stream progress via SSE
     if fmt == "pdf":
         progress_queue: asyncio.Queue[dict] = asyncio.Queue()
@@ -130,6 +175,7 @@ async def upload_import(
                     file_content=file_content,
                     fmt=fmt,
                     bank_profile_id=bank_profile_id,
+                    currency=currency or "EUR",
                     source=source,
                     source_config=source_config,
                     on_categorization_progress=on_progress,
@@ -176,6 +222,7 @@ async def upload_import(
             file_content=file_content,
             fmt=fmt,
             bank_profile_id=bank_profile_id,
+            currency=currency or "EUR",
             source=source,
             source_config=source_config,
         )
@@ -593,6 +640,45 @@ def debug_reset(
         "categories_deleted": cats,
         "imports_deleted": imps,
     }
+
+
+# ---------------------------------------------------------------------------
+# Debug – reset budget data for a single month
+# ---------------------------------------------------------------------------
+
+
+@router.post("/budget/debug/reset-month", status_code=status.HTTP_200_OK)
+def debug_reset_month(
+    month: int,
+    year: int,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Delete all budget transactions for the given month/year for the current user."""
+    import calendar
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+    if year < 2000 or year > 2100:
+        raise HTTPException(status_code=400, detail="Year must be between 2000 and 2100")
+
+    from datetime import date
+
+    first_day = date(year, month, 1)
+    last_day = date(year, month, calendar.monthrange(year, month)[1])
+
+    tx = (
+        db.query(BudgetTransaction)
+        .filter(
+            BudgetTransaction.user_id == user_id,
+            BudgetTransaction.date >= first_day,
+            BudgetTransaction.date <= last_day,
+        )
+        .delete(synchronize_session="fetch")
+    )
+    db.commit()
+
+    return {"transactions_deleted": tx}
 
 
 # ---------------------------------------------------------------------------
