@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 
-export function DebugMenu() {
+export function DebugMenu({ month, year }: { month: number; year: number }) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [currentModel, setCurrentModel] = useState<string | null>(null);
@@ -39,6 +39,23 @@ export function DebugMenu() {
     }
   }
 
+  async function handleResetMonth() {
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const label = `${monthNames[month - 1]} ${year}`;
+    if (!window.confirm(`Clear all budget transactions for ${label}?`)) return;
+    setStatus("Clearing...");
+    try {
+      const res = await apiFetch<{ transactions_deleted: number }>(
+        `/budget/debug/reset-month?month=${month}&year=${year}`,
+        { method: "POST" }
+      );
+      setStatus(`Deleted ${res.transactions_deleted} transactions for ${label}`);
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Clear failed");
+    }
+  }
+
   async function handleModelChange(model: string) {
     setCurrentModel(model);
     try {
@@ -67,6 +84,12 @@ export function DebugMenu() {
             className="w-full rounded-lg px-3 py-1.5 text-left font-mono text-xs text-on-surface-variant transition-colors hover:bg-surface-container-lowest hover:text-on-error-container"
           >
             Reset all data
+          </button>
+          <button
+            onClick={handleResetMonth}
+            className="w-full rounded-lg px-3 py-1.5 text-left font-mono text-xs text-on-surface-variant transition-colors hover:bg-surface-container-lowest hover:text-on-error-container"
+          >
+            Clear current month data
           </button>
 
           {availableModels.length > 0 && (

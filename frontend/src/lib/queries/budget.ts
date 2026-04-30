@@ -122,6 +122,7 @@ export interface SplitOverride {
 export interface UploadParams {
   file: File;
   source?: string;
+  currency?: string;
 }
 
 export function useBudgetSummary(
@@ -279,11 +280,14 @@ export function useImportUpload() {
   const queryClient = useQueryClient();
 
   return useMutation<ImportResponse, Error, UploadParams>({
-    mutationFn: ({ file, source }) => {
+    mutationFn: ({ file, source, currency }) => {
       const formData = new FormData();
       formData.append("file", file);
       if (source) {
         formData.append("source", source);
+      }
+      if (currency) {
+        formData.append("currency", currency);
       }
 
       return apiFetch<ImportResponse>("/budget/import/upload", {
@@ -321,7 +325,7 @@ export function useImportWithProgress() {
   });
 
   const upload = useCallback(
-    async (file: File, source?: string) => {
+    async (file: File, source?: string, currency?: string) => {
       setProgress({
         stage: "extracting",
         total: 0,
@@ -339,6 +343,9 @@ export function useImportWithProgress() {
       formData.append("file", file);
       if (source) {
         formData.append("source", source);
+      }
+      if (currency) {
+        formData.append("currency", currency);
       }
 
       try {

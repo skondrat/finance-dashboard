@@ -64,6 +64,7 @@ async def upload_import(
     file: UploadFile,
     source: Optional[str] = Form(default=None),
     bank_profile_id: Optional[str] = Form(default=None),
+    currency: Optional[str] = Form(default="EUR"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
@@ -130,6 +131,7 @@ async def upload_import(
                     file_content=file_content,
                     fmt=fmt,
                     bank_profile_id=bank_profile_id,
+                    currency=currency or "EUR",
                     source=source,
                     source_config=source_config,
                     on_categorization_progress=on_progress,
@@ -176,6 +178,7 @@ async def upload_import(
             file_content=file_content,
             fmt=fmt,
             bank_profile_id=bank_profile_id,
+            currency=currency or "EUR",
             source=source,
             source_config=source_config,
         )
@@ -593,6 +596,45 @@ def debug_reset(
         "categories_deleted": cats,
         "imports_deleted": imps,
     }
+
+
+# ---------------------------------------------------------------------------
+# Debug – reset budget data for a single month
+# ---------------------------------------------------------------------------
+
+
+@router.post("/budget/debug/reset-month", status_code=status.HTTP_200_OK)
+def debug_reset_month(
+    month: int,
+    year: int,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Delete all budget transactions for the given month/year for the current user."""
+    import calendar
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+    if year < 2000 or year > 2100:
+        raise HTTPException(status_code=400, detail="Year must be between 2000 and 2100")
+
+    from datetime import date
+
+    first_day = date(year, month, 1)
+    last_day = date(year, month, calendar.monthrange(year, month)[1])
+
+    tx = (
+        db.query(BudgetTransaction)
+        .filter(
+            BudgetTransaction.user_id == user_id,
+            BudgetTransaction.date >= first_day,
+            BudgetTransaction.date <= last_day,
+        )
+        .delete(synchronize_session="fetch")
+    )
+    db.commit()
+
+    return {"transactions_deleted": tx}
 
 
 # ---------------------------------------------------------------------------

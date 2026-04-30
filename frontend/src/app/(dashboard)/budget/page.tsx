@@ -176,7 +176,7 @@ export default function BudgetPage() {
             }}
           />
 
-          <DebugMenu />
+          <DebugMenu month={month} year={year} />
         </div>
       </div>
     </div>

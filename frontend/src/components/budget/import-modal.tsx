@@ -425,6 +425,7 @@ export function ImportModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [preview, setPreview] = useState<ImportResponse | null>(null);
   const [selectedSource, setSelectedSource] = useState<string>("");
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("EUR");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [overrides, setOverrides] = useState<Map<number, string | null>>(
     new Map()
@@ -465,9 +466,9 @@ export function ImportModal() {
         return;
       }
 
-      // Non-PDF: upload immediately
+      // Non-PDF: upload immediately with selected currency
       uploadMutation.mutate(
-        { file },
+        { file, currency: selectedCurrency },
         {
           onSuccess: (data) => {
             setPreview(data);
@@ -480,7 +481,7 @@ export function ImportModal() {
 
   function handleUploadPdf() {
     if (!selectedFile || !selectedSource) return;
-    sseUpload(selectedFile, selectedSource);
+    sseUpload(selectedFile, selectedSource, selectedCurrency);
   }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -656,6 +657,7 @@ export function ImportModal() {
           setSplitNotes("");
           setSelectedFile(null);
           setSelectedSource("");
+          setSelectedCurrency("EUR");
           uploadMutation.reset();
           sseReset();
           setIsOpen(false);
@@ -684,6 +686,7 @@ export function ImportModal() {
     setSplitNotes("");
     setSelectedFile(null);
     setSelectedSource("");
+    setSelectedCurrency("EUR");
     uploadMutation.reset();
     sseReset();
   }
@@ -699,6 +702,7 @@ export function ImportModal() {
     setSplitNotes("");
     setSelectedFile(null);
     setSelectedSource("");
+    setSelectedCurrency("EUR");
     uploadMutation.reset();
     sseReset();
     setIsOpen(false);
@@ -765,6 +769,29 @@ export function ImportModal() {
                   <p className="mt-2 font-body text-xs text-on-surface-variant/60">
                     or click to browse
                   </p>
+                </div>
+
+                {/* Currency selector */}
+                <div className="mt-4 flex items-center gap-3">
+                  <label className="font-mono text-xs uppercase tracking-[0.1em] text-on-surface-variant">
+                    Currency:
+                  </label>
+                  <div className="flex gap-1">
+                    {["EUR", "USD", "UAH"].map((cur) => (
+                      <button
+                        key={cur}
+                        onClick={() => setSelectedCurrency(cur)}
+                        className={cn(
+                          "rounded-lg px-3 py-1.5 font-mono text-xs transition-colors",
+                          selectedCurrency === cur
+                            ? "bg-on-surface text-surface"
+                            : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-lowest"
+                        )}
+                      >
+                        {cur}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Source selector for PDF */}
