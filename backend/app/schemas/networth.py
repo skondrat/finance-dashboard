@@ -67,6 +67,7 @@ class NetworthSnapshotResponse(BaseModel):
 class SnapshotUpdate(BaseModel):
     total_networth: Optional[float] = None
     breakdown: Optional[list] = None
+    currency: Optional[str] = None
 
 
 class NetworthHistoryResponse(BaseModel):
