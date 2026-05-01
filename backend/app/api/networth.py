@@ -273,26 +273,94 @@ def get_networth_history(
         if snap.snapshot_month not in by_month:
             by_month[snap.snapshot_month] = snap
 
-    # Convert any snapshots that aren't in the requested currency
+    # For each snapshot:
+    #   - convert total_networth to the requested currency
+    #   - leave each breakdown row's balance in its own row.currency
+    #   - add converted_balance per row for percentage computation
     snapshots = []
     for snap in by_month.values():
-        if snap.currency != currency:
-            rate = fx_service.get_rate(db, base=snap.currency, target=currency)
-            if rate is None:
-                row = fx_service.fetch_daily_rate(db, base=snap.currency, target=currency)
-                rate = row.rate if row else Decimal("1")
-            snap.total_networth = snap.total_networth * rate
-            if snap.breakdown:
-                snap.breakdown = [
-                    {**entry, "balance": float(Decimal(str(entry["balance"])) * rate)}
-                    for entry in snap.breakdown
-                ]
-            snap.currency = currency
+        stored_currency = snap.currency
+
+        if stored_currency != currency:
+            total_rate = fx_service.get_rate(db, base=stored_currency, target=currency)
+            if total_rate is None:
+                row = fx_service.fetch_daily_rate(db, base=stored_currency, target=currency)
+                total_rate = row.rate if row else Decimal("1")
+            snap.total_networth = snap.total_networth * total_rate
+
+        if snap.breakdown:
+            new_breakdown = []
+            for entry in snap.breakdown:
+                row_currency = entry.get("currency") or stored_currency
+                row_balance = Decimal(str(entry["balance"]))
+                if row_currency == currency:
+                    converted_balance = row_balance
+                else:
+                    row_rate = fx_service.get_rate(db, base=row_currency, target=currency)
+                    if row_rate is None:
+                        row = fx_service.fetch_daily_rate(db, base=row_currency, target=currency)
+                        row_rate = row.rate if row else Decimal("1")
+                    converted_balance = row_balance * row_rate
+                new_breakdown.append({
+                    **entry,
+                    "currency": row_currency,
+                    "converted_balance": float(converted_balance),
+                })
+            snap.breakdown = new_breakdown
+
+        snap.currency = currency
         snapshots.append(snap)
 
     snapshots.sort(key=lambda s: s.snapshot_month)
 
     return NetworthHistoryResponse(snapshots=snapshots)
+
+
+# ---------------------------------------------------------------------------
+# Portfolio value at date (for resetting historical investment rows)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/portfolio-value")
+def get_portfolio_value_at_date(
+    account_name: str,
+    as_of: str,
+    currency: str = "EUR",
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Return the portfolio account's value on `as_of` (YYYY-MM-DD).
+
+    Used by the historical net-worth view to reset an investment row to the
+    portfolio's actual computed value for that month.
+    """
+    from datetime import datetime as _dt
+
+    try:
+        as_of_date = _dt.strptime(as_of, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="as_of must be in YYYY-MM-DD format",
+        )
+
+    acct = (
+        db.query(Account)
+        .filter(Account.user_id == user_id, Account.name == account_name)
+        .first()
+    )
+    if acct is None:
+        return {"found": False, "value": 0.0, "currency": currency, "as_of": as_of}
+
+    value = portfolio_service.get_account_value_at_date(
+        db, user_id, acct.id, as_of_date, currency
+    )
+    return {
+        "found": True,
+        "value": float(value),
+        "currency": currency,
+        "as_of": as_of,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -419,10 +487,33 @@ def update_snapshot(
     if snapshot is None:
         raise HTTPException(status_code=404, detail="Snapshot not found")
 
-    if payload.total_networth is not None:
-        snapshot.total_networth = Decimal(str(payload.total_networth))
     if payload.breakdown is not None:
-        snapshot.breakdown = payload.breakdown
+        # Strip the response-only converted_balance field before persisting
+        cleaned = []
+        for entry in payload.breakdown:
+            row = {k: v for k, v in entry.items() if k != "converted_balance"}
+            cleaned.append(row)
+        snapshot.breakdown = cleaned if cleaned else None
+
+        # Recompute total_networth in the snapshot's stored currency
+        new_total = Decimal("0")
+        for row in cleaned:
+            row_currency = row.get("currency") or snapshot.currency
+            row_balance = Decimal(str(row["balance"]))
+            if row_currency == snapshot.currency:
+                new_total += row_balance
+            else:
+                rate = fx_service.get_rate(db, base=row_currency, target=snapshot.currency)
+                if rate is None:
+                    fetched = fx_service.fetch_daily_rate(
+                        db, base=row_currency, target=snapshot.currency
+                    )
+                    rate = fetched.rate if fetched else Decimal("1")
+                new_total += row_balance * rate
+        snapshot.total_networth = new_total
+    elif payload.total_networth is not None:
+        snapshot.total_networth = Decimal(str(payload.total_networth))
+
     snapshot.updated_at = datetime.utcnow()
 
     db.commit()

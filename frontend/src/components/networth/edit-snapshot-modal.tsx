@@ -91,6 +91,7 @@ export function EditSnapshotModal({ open, onClose }: EditSnapshotModalProps) {
         id: snapshot.id,
         total_networth: liveTotal,
         breakdown: updatedBreakdown,
+        currency: snapshot.currency,
       },
       { onSuccess: handleClose }
     );

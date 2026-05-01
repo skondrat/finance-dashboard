@@ -33,20 +33,23 @@ def capture_snapshot(db: Session, user_id: str, currency: str = "EUR") -> None:
     breakdown = []
 
     for acct in manual_accounts:
+        original_balance = acct.balance.quantize(_QUANT_2, rounding=ROUND_HALF_UP)
+
         if acct.currency == currency:
-            converted = acct.balance
+            converted = original_balance
         else:
             rate = fx_service.get_rate(db, base=acct.currency, target=currency)
             converted = fx_service.convert(acct.balance, acct.currency, currency, rate) if rate else acct.balance
+            converted = converted.quantize(_QUANT_2, rounding=ROUND_HALF_UP)
 
-        converted = converted.quantize(_QUANT_2, rounding=ROUND_HALF_UP)
         manual_total += converted
 
         breakdown.append({
             "name": acct.name,
-            "balance": float(converted),
+            "balance": float(original_balance),
             "source": "manual",
             "account_type": acct.account_type,
+            "currency": acct.currency,
         })
 
     # --- Investment accounts ---
@@ -72,6 +75,7 @@ def capture_snapshot(db: Session, user_id: str, currency: str = "EUR") -> None:
             "balance": float(account_value),
             "source": "investment",
             "account_type": None,
+            "currency": currency,
         })
 
     total_networth = (manual_total + investment_total).quantize(_QUANT_2, rounding=ROUND_HALF_UP)

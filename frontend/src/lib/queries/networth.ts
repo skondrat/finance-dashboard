@@ -57,6 +57,8 @@ export interface NetworthSnapshot {
     balance: number;
     source: string;
     account_type: string | null;
+    currency?: string;
+    converted_balance?: number;
   }> | null;
   updated_at: string;
 }
@@ -206,13 +208,15 @@ export function useDeleteManualSnapshots() {
 // ---------------------------------------------------------------------------
 
 export interface UpdateSnapshotPayload {
-  total_networth: number;
-  breakdown: Array<{
+  total_networth?: number;
+  breakdown?: Array<{
     name: string;
     balance: number;
     source: string;
     account_type: string | null;
+    currency?: string;
   }> | null;
+  currency?: string;
 }
 
 export function useUpdateSnapshot() {
@@ -228,6 +232,32 @@ export function useUpdateSnapshot() {
       queryClient.invalidateQueries({ queryKey: ["networth"] });
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Portfolio value at date (for resetting historical investment rows)
+// ---------------------------------------------------------------------------
+
+export interface PortfolioValueAtDateResponse {
+  found: boolean;
+  value: number;
+  currency: string;
+  as_of: string;
+}
+
+export async function fetchPortfolioValueAtDate(
+  accountName: string,
+  asOf: string,
+  currency: string
+): Promise<PortfolioValueAtDateResponse> {
+  const params = new URLSearchParams({
+    account_name: accountName,
+    as_of: asOf,
+    currency,
+  });
+  return apiFetch<PortfolioValueAtDateResponse>(
+    `/networth/portfolio-value?${params.toString()}`
+  );
 }
 
 // ---------------------------------------------------------------------------

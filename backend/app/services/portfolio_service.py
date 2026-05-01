@@ -261,6 +261,89 @@ def get_positions(
     return results
 
 
+def get_account_value_at_date(
+    db: Session,
+    user_id: str,
+    account_id: str,
+    as_of: date,
+    currency: str = "EUR",
+) -> Decimal:
+    """Return the portfolio account's total value on `as_of`, in `currency`.
+
+    Positions are computed from transactions with date <= as_of. Each position
+    is valued at the latest AssetPrice on or before as_of, then converted to
+    `currency` using the latest exchange rate.
+    """
+
+    txns = (
+        db.query(InvestmentTransaction)
+        .join(Account, InvestmentTransaction.account_id == Account.id)
+        .filter(
+            Account.user_id == user_id,
+            InvestmentTransaction.account_id == account_id,
+            InvestmentTransaction.date <= as_of,
+        )
+        .order_by(InvestmentTransaction.date, InvestmentTransaction.created_at)
+        .all()
+    )
+
+    holdings: dict[str, Decimal] = defaultdict(lambda: _ZERO)
+    for tx in txns:
+        if tx.type == "buy":
+            holdings[tx.asset_id] += tx.quantity
+        elif tx.type == "sell":
+            holdings[tx.asset_id] -= tx.quantity
+
+    holdings = {aid: q for aid, q in holdings.items() if q > _ZERO}
+    if not holdings:
+        return _ZERO
+
+    asset_ids = list(holdings.keys())
+
+    latest_date_sq = (
+        db.query(
+            AssetPrice.asset_id,
+            func.max(AssetPrice.date).label("max_date"),
+        )
+        .filter(
+            AssetPrice.asset_id.in_(asset_ids),
+            AssetPrice.date <= as_of,
+        )
+        .group_by(AssetPrice.asset_id)
+        .subquery()
+    )
+    rows = (
+        db.query(AssetPrice.asset_id, AssetPrice.close_price, AssetPrice.currency)
+        .join(
+            latest_date_sq,
+            and_(
+                AssetPrice.asset_id == latest_date_sq.c.asset_id,
+                AssetPrice.date == latest_date_sq.c.max_date,
+            ),
+        )
+        .all()
+    )
+    price_map = {r.asset_id: (r.close_price, r.currency) for r in rows}
+
+    fx_cache: dict[str, Decimal] = {}
+
+    def _fx(from_ccy: str) -> Decimal:
+        if from_ccy not in fx_cache:
+            fx_cache[from_ccy] = _get_fx_rate(db, from_ccy, currency)
+        return fx_cache[from_ccy]
+
+    total = _ZERO
+    for asset_id, qty in holdings.items():
+        entry = price_map.get(asset_id)
+        if entry is None:
+            continue
+        raw_price, price_ccy = entry
+        rate = _fx(price_ccy)
+        total += qty * raw_price * rate
+
+    return total.quantize(_QUANT_2, rounding=ROUND_HALF_UP)
+
+
 def get_summary(
     db: Session,
     user_id: str,

@@ -1,6 +1,6 @@
 # finance-dashboard Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-30
+Auto-generated from all feature plans. Last updated: 2026-05-01
 
 ## Active Technologies
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, pdfplumber (PDF table extraction), anthropic (Anthropic Python SDK), Next.js 16, TanStack Query, Zustand, react-dropzone (002-pdf-statement-import)
@@ -57,6 +57,8 @@ Auto-generated from all feature plans. Last updated: 2026-04-30
 - TypeScript 5 (frontend only) + Next.js 16, Recharts 3.8.1 (Treemap component), TanStack Query v5, Zustand, Tailwind CSS v4 (075-budget-spend-treemap)
 - N/A (reads from existing backend API) (075-budget-spend-treemap)
 - SQLite via SQLAlchemy (existing `budget_transactions` table — no schema changes) (076-budget-clear-import-currency)
+- TypeScript 5 (frontend only — no backend changes) + Next.js 16, TanStack Query v5, Zustand, Tailwind CSS v4 (077-networth-month-selector)
+- N/A (reads existing `networth_snapshots` table via existing endpoints) (077-networth-month-selector)
 
 - Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0, Alembic (backend); Next.js 15, Tailwind CSS 4, shadcn/ui, Recharts, TanStack Query, Zustand (frontend) (001-finance-dashboard)
 
@@ -76,9 +78,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11 (backend), TypeScript 5 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 077-networth-month-selector: Added TypeScript 5 (frontend only — no backend changes) + Next.js 16, TanStack Query v5, Zustand, Tailwind CSS v4
 - 076-budget-clear-import-currency: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query v5, Zustand (frontend)
 - 075-budget-spend-treemap: Added TypeScript 5 (frontend only) + Next.js 16, Recharts 3.8.1 (Treemap component), TanStack Query v5, Zustand, Tailwind CSS v4
-- 067-cashflow-period-selector: Added Python 3.11 (backend), TypeScript 5 (frontend) + FastAPI, SQLAlchemy 2.0 (backend); Next.js 16, TanStack Query v5, Zustand (frontend)
 
 
 <!-- MANUAL ADDITIONS START -->

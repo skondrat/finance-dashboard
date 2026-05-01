@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { NetworthChart } from "@/components/networth/networth-chart";
 import { SummaryKpi } from "@/components/networth/summary-kpi";
 import { AccountsTable } from "@/components/networth/accounts-table";
@@ -8,8 +8,15 @@ import { AddAccountModal } from "@/components/networth/add-account-modal";
 import { ImportNetworthModal } from "@/components/networth/import-networth-modal";
 import { EditSnapshotModal } from "@/components/networth/edit-snapshot-modal";
 import { NetworthComposition } from "@/components/networth/networth-composition";
+import { NetworthMonthSelector } from "@/components/networth/month-selector";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useNetworthSummary, useNetworthHistory, useDeleteManualSnapshots } from "@/lib/queries/networth";
+
+function readSessionInt(key: string, fallback: number): number {
+  if (typeof window === "undefined") return fallback;
+  const v = sessionStorage.getItem(key);
+  return v ? parseInt(v, 10) : fallback;
+}
 
 function SettingsDropdown({
   showDebts,
@@ -123,6 +130,24 @@ export default function NetworthPage() {
     account_type: string;
   } | null>(null);
 
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const [selectedMonth, setSelectedMonthRaw] = useState(() =>
+    readSessionInt("networth_month", currentMonth)
+  );
+  const [selectedYear, setSelectedYearRaw] = useState(() =>
+    readSessionInt("networth_year", currentYear)
+  );
+  const setSelectedMonth = (m: number) => {
+    sessionStorage.setItem("networth_month", String(m));
+    setSelectedMonthRaw(m);
+  };
+  const setSelectedYear = (y: number) => {
+    sessionStorage.setItem("networth_year", String(y));
+    setSelectedYearRaw(y);
+  };
+
   const deleteManualMutation = useDeleteManualSnapshots();
 
   const { data: history } = useNetworthHistory();
@@ -131,6 +156,27 @@ export default function NetworthPage() {
 
   const hasAccounts =
     summary && summary.accounts.length > 0;
+
+  const selectedMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+  const isCurrentMonth =
+    selectedMonth === currentMonth && selectedYear === currentYear;
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>([currentYear]);
+    for (const snap of history?.snapshots ?? []) {
+      const y = parseInt(snap.snapshot_month.slice(0, 4), 10);
+      if (!Number.isNaN(y)) years.add(y);
+    }
+    return Array.from(years).sort((a, b) => a - b);
+  }, [history, currentYear]);
+
+  const historicalSnapshot = useMemo(() => {
+    if (isCurrentMonth) return null;
+    return (
+      history?.snapshots.find((s) => s.snapshot_month === selectedMonthKey) ??
+      null
+    );
+  }, [history, selectedMonthKey, isCurrentMonth]);
 
   return (
     <div className="space-y-6">
@@ -148,15 +194,17 @@ export default function NetworthPage() {
             }}
             hasManualEntries={hasManualEntries}
           />
-          <button
-            onClick={() => {
-              setEditAccount(null);
-              setModalOpen(true);
-            }}
-            className="rounded-xl bg-surface-container-high px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-on-surface transition-colors hover:bg-surface-container-highest"
-          >
-            Add Account
-          </button>
+          {isCurrentMonth && (
+            <button
+              onClick={() => {
+                setEditAccount(null);
+                setModalOpen(true);
+              }}
+              className="rounded-xl bg-surface-container-high px-4 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-on-surface transition-colors hover:bg-surface-container-highest"
+            >
+              Add Account
+            </button>
+          )}
         </div>
       </div>
 
@@ -167,7 +215,19 @@ export default function NetworthPage() {
         <NetworthComposition />
       </div>
 
-      {!isLoading && !hasAccounts ? (
+      <div className="flex items-center justify-end">
+        <NetworthMonthSelector
+          month={selectedMonth}
+          year={selectedYear}
+          availableYears={availableYears}
+          currentMonth={currentMonth}
+          currentYear={currentYear}
+          onMonthChange={setSelectedMonth}
+          onYearChange={setSelectedYear}
+        />
+      </div>
+
+      {!isLoading && !hasAccounts && isCurrentMonth ? (
         <EmptyState
           title="No accounts yet"
           description="Add your bank accounts, crypto wallets, and cash savings to see your total net worth."
@@ -182,6 +242,9 @@ export default function NetworthPage() {
       ) : (
         <AccountsTable
           showDebts={showDebts}
+          isCurrentMonth={isCurrentMonth}
+          selectedMonthKey={selectedMonthKey}
+          historicalSnapshot={historicalSnapshot}
           onEdit={(acct) => {
             setEditAccount(acct);
             setModalOpen(true);
