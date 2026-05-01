@@ -122,11 +122,15 @@ export interface UpdateTransactionPayload {
   date?: string;
 }
 
-export function useUpdateTransaction(accountId: string) {
+export function useUpdateTransaction() {
   const queryClient = useQueryClient();
 
-  return useMutation<Transaction, Error, { txnId: string; payload: UpdateTransactionPayload }>({
-    mutationFn: ({ txnId, payload }) =>
+  return useMutation<
+    Transaction,
+    Error,
+    { accountId: string; txnId: string; payload: UpdateTransactionPayload }
+  >({
+    mutationFn: ({ accountId, txnId, payload }) =>
       apiFetch<Transaction>(`/accounts/${accountId}/transactions/${txnId}`, {
         method: "PUT",
         body: JSON.stringify(payload),
@@ -138,11 +142,11 @@ export function useUpdateTransaction(accountId: string) {
   });
 }
 
-export function useDeleteTransaction(accountId: string) {
+export function useDeleteTransaction() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, string>({
-    mutationFn: (txnId) =>
+  return useMutation<void, Error, { accountId: string; txnId: string }>({
+    mutationFn: ({ accountId, txnId }) =>
       apiFetch<void>(`/accounts/${accountId}/transactions/${txnId}`, {
         method: "DELETE",
       }),

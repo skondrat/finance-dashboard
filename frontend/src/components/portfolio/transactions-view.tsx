@@ -50,8 +50,8 @@ export function TransactionsView({ accountId }: TransactionsViewProps) {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<UpdateTransactionPayload>({});
-  const updateTxn = useUpdateTransaction(accountId ?? "");
-  const deleteTxn = useDeleteTransaction(accountId ?? "");
+  const updateTxn = useUpdateTransaction();
+  const deleteTxn = useDeleteTransaction();
 
   // Normalize both transaction types to a common shape
   const normalizedTxs = useMemo(() => {
@@ -170,9 +170,10 @@ export function TransactionsView({ accountId }: TransactionsViewProps) {
                           <button
                             onClick={() => {
                               if (txAccountId) {
-                                updateTxn.mutate({ txnId: tx.id, payload: editForm }, {
-                                  onSuccess: () => { setEditingId(null); setEditForm({}); }
-                                });
+                                updateTxn.mutate(
+                                  { accountId: txAccountId, txnId: tx.id, payload: editForm },
+                                  { onSuccess: () => { setEditingId(null); setEditForm({}); } }
+                                );
                               }
                             }}
                             disabled={updateTxn.isPending}
@@ -254,8 +255,8 @@ export function TransactionsView({ accountId }: TransactionsViewProps) {
                               <button
                                 onClick={() => {
                                   setMenuOpenId(null);
-                                  if (confirm(`Delete this ${tx.type} transaction for ${tx.asset.ticker}?`)) {
-                                    deleteTxn.mutate(tx.id);
+                                  if (txAccountId && confirm(`Delete this ${tx.type} transaction for ${tx.asset.ticker}?`)) {
+                                    deleteTxn.mutate({ accountId: txAccountId, txnId: tx.id });
                                   }
                                 }}
                                 className="w-full px-4 py-2 text-left font-body text-sm text-on-error-container hover:bg-surface-container-highest"

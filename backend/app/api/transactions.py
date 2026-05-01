@@ -34,22 +34,27 @@ def _ensure_account(db: Session, account_id: str, user_id: str) -> Account:
     return account
 
 
-def _resolve_asset(db: Session, ticker: str) -> Asset:
-    """Return an existing Asset by ticker, or create a minimal placeholder."""
+def _resolve_asset(
+    db: Session, ticker: str, default_currency: str = "USD"
+) -> Asset:
+    """Return an existing Asset by ticker, or create a minimal placeholder.
+
+    For new assets, the transaction's currency is used as the default. The
+    next price refresh will override it with the security's actual native
+    currency reported by yfinance.
+    """
     asset = db.query(Asset).filter(Asset.ticker == ticker).first()
     if asset is not None:
         return asset
 
-    # Create a minimal asset record – the user (or a background job) can
-    # enrich it later with name, sector, region, etc.
     asset = Asset(
         ticker=ticker,
-        name=ticker,          # placeholder name
-        asset_type="stock",   # default; caller can update
-        currency="USD",       # default
+        name=ticker,
+        asset_type="stock",
+        currency=default_currency,
     )
     db.add(asset)
-    db.flush()  # assign an ID so we can reference it immediately
+    db.flush()
     return asset
 
 
@@ -111,7 +116,7 @@ def create_transaction(
     record is created automatically.
     """
     _ensure_account(db, account_id, user_id)
-    asset = _resolve_asset(db, payload.asset_ticker)
+    asset = _resolve_asset(db, payload.asset_ticker, default_currency=payload.currency)
 
     tx = InvestmentTransaction(
         account_id=account_id,
@@ -163,7 +168,9 @@ def update_transaction(
 
     # If the ticker is being changed, resolve the new asset
     if "asset_ticker" in update_data:
-        asset = _resolve_asset(db, update_data.pop("asset_ticker"))
+        new_ticker = update_data.pop("asset_ticker")
+        new_currency = update_data.get("currency", tx.currency)
+        asset = _resolve_asset(db, new_ticker, default_currency=new_currency)
         tx.asset_id = asset.id
 
     for field, value in update_data.items():

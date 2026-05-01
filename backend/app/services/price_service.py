@@ -60,15 +60,39 @@ class YFinanceProvider(PriceProvider):
     # -- public interface ----------------------------------------------------
 
     def fetch_price(self, ticker: str) -> Decimal | None:
+        result = self.fetch_price_with_currency(ticker)
+        return result[0] if result else None
+
+    def fetch_price_with_currency(
+        self, ticker: str
+    ) -> tuple[Decimal, str] | None:
+        """Return (price, currency). yfinance reports prices in the
+        security's native trading currency, exposed via fast_info.currency.
+        """
         if self._yf is None:
             return None
         try:
             t = self._yf.Ticker(ticker)
             hist = t.history(period="5d")
-            if not hist.empty:
-                last_close = hist["Close"].iloc[-1]
-                if last_close > 0:
-                    return Decimal(str(round(last_close, 8)))
+            if hist.empty:
+                return None
+            last_close = hist["Close"].iloc[-1]
+            if not (last_close > 0):
+                return None
+
+            currency = "USD"
+            try:
+                fi = t.fast_info
+                ccy = fi.get("currency") if hasattr(fi, "get") else fi["currency"]
+                if ccy:
+                    currency = str(ccy).upper()
+            except Exception:
+                logger.warning(
+                    "YFinance: fast_info.currency unavailable for %s, defaulting to USD",
+                    ticker,
+                )
+
+            return Decimal(str(round(last_close, 8))), currency
         except Exception:
             logger.exception("YFinance: error fetching quote for %s", ticker)
         return None
@@ -259,7 +283,9 @@ def seed_historical_prices(db: Session, user_id: str) -> int:
             continue
 
         source = "coingecko" if asset.asset_type == "crypto" else "yfinance"
-        price_currency = "EUR" if source == "coingecko" else "USD"
+        # Trust the asset's currency (kept in sync by refresh_prices via
+        # yfinance.fast_info). Fall back to USD only if asset.currency is unset.
+        price_currency = asset.currency or ("EUR" if source == "coingecko" else "USD")
 
         for entry in history:
             existing = (
@@ -316,8 +342,16 @@ def refresh_prices(db: Session, user_id: str) -> int:
 
     for asset in assets:
         provider = get_provider(asset.asset_type)
+        price: Decimal | None = None
+        price_currency = "USD"
         try:
-            price = provider.fetch_price(asset.ticker)
+            if isinstance(provider, YFinanceProvider):
+                resolved = provider.fetch_price_with_currency(asset.ticker)
+                if resolved is not None:
+                    price, price_currency = resolved
+            else:
+                price = provider.fetch_price(asset.ticker)
+                price_currency = "EUR" if asset.asset_type == "crypto" else "USD"
         except Exception:
             logger.exception("Failed to fetch price for %s", asset.ticker)
             continue
@@ -325,7 +359,9 @@ def refresh_prices(db: Session, user_id: str) -> int:
         if price is None:
             continue
 
-        # Upsert: update if same asset+date already exists, else insert
+        if asset.currency != price_currency:
+            asset.currency = price_currency
+
         existing = (
             db.query(AssetPrice)
             .filter(
@@ -338,7 +374,6 @@ def refresh_prices(db: Session, user_id: str) -> int:
         )
 
         source = "coingecko" if asset.asset_type == "crypto" else "yfinance"
-        price_currency = "EUR" if source == "coingecko" else "USD"
 
         if existing:
             existing.close_price = price

@@ -63,11 +63,16 @@ def _get_fx_rate(
 
 
 def _latest_prices_map(db: Session, asset_ids: list[str]) -> dict[str, tuple[Decimal, str]]:
-    """Return a mapping of asset_id → (latest close_price, currency) for the given IDs."""
+    """Return a mapping of asset_id → (latest close_price, currency) for the given IDs.
+
+    Falls back to the most recent investment transaction's price when no
+    AssetPrice exists for an asset (e.g., the ticker can't be resolved by
+    the price feed). This keeps holdings visible at their purchase price
+    instead of showing $0.
+    """
     if not asset_ids:
         return {}
 
-    # Sub-query: max date per asset
     latest_date_sq = (
         db.query(
             AssetPrice.asset_id,
@@ -89,7 +94,41 @@ def _latest_prices_map(db: Session, asset_ids: list[str]) -> dict[str, tuple[Dec
         )
         .all()
     )
-    return {r.asset_id: (r.close_price, r.currency) for r in rows}
+    result: dict[str, tuple[Decimal, str]] = {
+        r.asset_id: (r.close_price, r.currency) for r in rows
+    }
+
+    missing = [aid for aid in asset_ids if aid not in result]
+    if missing:
+        latest_tx_date_sq = (
+            db.query(
+                InvestmentTransaction.asset_id,
+                func.max(InvestmentTransaction.date).label("max_date"),
+            )
+            .filter(InvestmentTransaction.asset_id.in_(missing))
+            .group_by(InvestmentTransaction.asset_id)
+            .subquery()
+        )
+        tx_rows = (
+            db.query(
+                InvestmentTransaction.asset_id,
+                InvestmentTransaction.price_per_unit,
+                InvestmentTransaction.currency,
+            )
+            .join(
+                latest_tx_date_sq,
+                and_(
+                    InvestmentTransaction.asset_id == latest_tx_date_sq.c.asset_id,
+                    InvestmentTransaction.date == latest_tx_date_sq.c.max_date,
+                ),
+            )
+            .all()
+        )
+        for r in tx_rows:
+            if r.asset_id not in result:
+                result[r.asset_id] = (r.price_per_unit, r.currency)
+
+    return result
 
 
 def _date_range_start(range_str: str) -> date:
